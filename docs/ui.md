@@ -1,0 +1,74 @@
+# UI Coding Standards
+
+## Component Library
+
+**Only shadcn/ui components are permitted in this project.**
+
+Do not create custom UI components. Every UI element — buttons, inputs, dialogs, tables, cards, badges, dropdowns, etc. — must come from the shadcn/ui library. If a component you need does not yet exist in `components/ui/`, add it via the CLI:
+
+```bash
+npx shadcn add <component>
+```
+
+This applies without exception to:
+- Layout primitives (Card, Separator, Sheet, etc.)
+- Form controls (Input, Select, Checkbox, Switch, Textarea, etc.)
+- Feedback elements (Alert, Badge, Toast/Sonner, Progress, Skeleton, etc.)
+- Navigation (Tabs, Breadcrumb, Pagination, NavigationMenu, etc.)
+- Overlays (Dialog, Drawer, Popover, Tooltip, HoverCard, etc.)
+- Data display (Table, Avatar, Calendar, etc.)
+
+### What "no custom components" means
+
+- Do not create new files under `components/ui/` by hand.
+- Do not write wrapper components that re-export or style a shadcn primitive differently.
+- Do not reach for raw HTML elements (`<button>`, `<input>`, `<table>`) where a shadcn component exists.
+- Composition of existing shadcn components inside page or feature files is fine — that is not the same as creating a new custom component.
+
+### className merging
+
+Always use the `cn()` helper from `@/lib/utils` when applying conditional or merged class names:
+
+```tsx
+import { cn } from '@/lib/utils';
+
+<Button className={cn('w-full', isLoading && 'opacity-50')} />
+```
+
+---
+
+## Date Formatting
+
+All dates displayed in the UI must be formatted using **date-fns**.
+
+### Required format
+
+Dates must use ordinal day, abbreviated month, and 4-digit year:
+
+| Raw date       | Displayed as   |
+|----------------|----------------|
+| 2025-09-01     | 1st Sep 2025   |
+| 2025-08-02     | 2nd Aug 2025   |
+| 2026-01-03     | 3rd Jan 2026   |
+| 2024-06-04     | 4th Jun 2024   |
+
+### Implementation
+
+```tsx
+import { format } from 'date-fns';
+
+function formatDate(date: Date | string): string {
+  return format(new Date(date), 'do MMM yyyy');
+}
+```
+
+`date-fns` `format` tokens used:
+- `do` — ordinal day (1st, 2nd, 3rd, 4th…)
+- `MMM` — abbreviated month (Jan, Feb, Mar…)
+- `yyyy` — 4-digit year
+
+### Rules
+
+- Never use `Date.toLocaleDateString()`, `Intl.DateTimeFormat`, or manual string concatenation for date display.
+- Never hardcode date format strings outside of a shared utility; if the same pattern is used more than once, extract it to `lib/utils.ts` or a dedicated `lib/format.ts`.
+- For date-time display (when time is also needed), extend the format consistently: `do MMM yyyy, HH:mm`.
