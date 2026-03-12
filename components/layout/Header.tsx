@@ -3,8 +3,6 @@
 import { UserButton } from '@clerk/nextjs';
 import {
   AlignLeft,
-  AlignRight,
-  ArrowDown,
   ArrowUp,
   PanelLeft,
 } from 'lucide-react';
@@ -28,21 +26,19 @@ interface HeaderProps {
 
 const positionIcons: Record<SidebarPosition, React.ReactNode> = {
   left: <AlignLeft className="h-4 w-4" />,
-  right: <AlignRight className="h-4 w-4" />,
   top: <ArrowUp className="h-4 w-4" />,
-  bottom: <ArrowDown className="h-4 w-4" />,
 };
 
 export function Header({ sidebarPosition, onPositionChange }: HeaderProps) {
   const { t, language, setLanguage } = useLanguage();
   const { toggleSidebar, isMobile } = useSidebar();
 
-  const positions: SidebarPosition[] = ['left', 'right', 'top', 'bottom'];
+  const positions: SidebarPosition[] = ['left', 'top'];
 
   return (
     <header className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0">
       <div className="flex items-center gap-3">
-        {(sidebarPosition === 'left' || sidebarPosition === 'right') && (
+        {sidebarPosition === 'left' && (
           <Button variant="ghost" size="icon" onClick={toggleSidebar} className="h-8 w-8">
             <PanelLeft className="h-4 w-4" />
             <span className="sr-only">Toggle sidebar</span>

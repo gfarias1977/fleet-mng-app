@@ -35,6 +35,8 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from '@/components/ui/sidebar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 import { useLanguage } from '@/hooks/use-language';
 
 interface NavItem {
@@ -125,32 +127,46 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {navGroups.map((group) => (
-          <SidebarGroup key={group.labelKey}>
-            <SidebarGroupLabel>
-              <group.icon className="mr-1 h-3.5 w-3.5" />
-              {t(group.labelKey)}
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.href || pathname.startsWith(item.href + '/')}
-                      tooltip={t(item.labelKey)}
-                    >
-                      <Link href={item.href}>
-                        <item.icon />
-                        <span>{t(item.labelKey)}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {navGroups.map((group) => {
+          const anyItemActive = group.items.some(
+            (item) => pathname === item.href || pathname.startsWith(item.href + '/')
+          );
+          return (
+            <Collapsible key={group.labelKey} defaultOpen={anyItemActive}>
+              <SidebarGroup>
+                <SidebarGroupLabel asChild>
+                  <CollapsibleTrigger className="flex w-full items-center justify-between [&[data-state=open]>svg:last-child]:rotate-180">
+                    <span className="flex items-center gap-1">
+                      <group.icon className="h-3.5 w-3.5" />
+                      {t(group.labelKey)}
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200" />
+                  </CollapsibleTrigger>
+                </SidebarGroupLabel>
+                <CollapsibleContent>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {group.items.map((item) => (
+                        <SidebarMenuItem key={item.href}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={pathname === item.href || pathname.startsWith(item.href + '/')}
+                            tooltip={t(item.labelKey)}
+                          >
+                            <Link href={item.href}>
+                              <item.icon />
+                              <span>{t(item.labelKey)}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </CollapsibleContent>
+              </SidebarGroup>
+            </Collapsible>
+          );
+        })}
       </SidebarContent>
 
       <SidebarFooter />

@@ -7,7 +7,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { TopNav } from '@/components/layout/TopNav';
 
-export type SidebarPosition = 'left' | 'right' | 'top' | 'bottom';
+export type SidebarPosition = 'left' | 'top';
 
 const STORAGE_KEY = 'sidebar-position';
 
@@ -20,7 +20,7 @@ export function AppShell({ children }: AppShellProps) {
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as SidebarPosition | null;
-    if (stored && ['left', 'right', 'top', 'bottom'].includes(stored)) {
+    if (stored && ['left', 'top'].includes(stored)) {
       setPosition(stored);
     }
   }, []);
@@ -30,10 +30,9 @@ export function AppShell({ children }: AppShellProps) {
     localStorage.setItem(STORAGE_KEY, newPosition);
   }
 
-  if (position === 'top' || position === 'bottom') {
-    const isBottom = position === 'bottom';
+  if (position === 'top') {
     return (
-      <div className={`flex h-screen w-full flex-col${isBottom ? '-reverse' : ''}`}>
+      <div className="flex h-screen w-full flex-col">
         <TopNav position={position} onPositionChange={handlePositionChange} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <main className="flex-1 overflow-y-auto">{children}</main>
@@ -43,11 +42,9 @@ export function AppShell({ children }: AppShellProps) {
     );
   }
 
-  const isRight = position === 'right';
-
   return (
     <SidebarProvider>
-      <div className={`flex h-screen w-full${isRight ? ' flex-row-reverse' : ''}`}>
+      <div className="flex h-screen w-full">
         <AppSidebar />
         <SidebarInset className="flex flex-col overflow-hidden">
           <Header sidebarPosition={position} onPositionChange={handlePositionChange} />
