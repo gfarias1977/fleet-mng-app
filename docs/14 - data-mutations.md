@@ -4,16 +4,16 @@
 
 All data mutations follow a strict two-layer pattern:
 
-1. **`src/data/` helper** — a plain async function that wraps a Drizzle ORM write operation
+1. **`data/` helper** — a plain async function that wraps a Drizzle ORM write operation
 2. **Server Action in `actions.ts`** — validates input with Zod, calls the data helper, returns a typed result
 
 No other mutation pattern is permitted.
 
 ---
 
-## Layer 1 — Data helpers in `src/data/`
+## Layer 1 — Data helpers in `data/`
 
-All database write operations (insert, update, delete) must be encapsulated in helper functions inside `src/data/`. The same directory used for read helpers (see `docs/data-fetching.md`) is used for mutations — one file per domain entity.
+All database write operations (insert, update, delete) must be encapsulated in helper functions inside `data/`. The same directory used for read helpers (see `docs/data-fetching.md`) is used for mutations — one file per domain entity.
 
 - Use Drizzle ORM for every query. Raw SQL is never permitted.
 - Functions must be named clearly for the operation they perform (`createDevice`, `updateGeofence`, `deleteAlert`, etc.).
@@ -21,7 +21,7 @@ All database write operations (insert, update, delete) must be encapsulated in h
 - Functions are only called from Server Actions, never from Client Components or route handlers.
 
 ```ts
-// ✅ Correct — src/data/devices.ts
+// ✅ Correct — data/devices.ts
 import { db } from '@/src/db';
 import { devicesTable } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
@@ -59,7 +59,7 @@ export async function deleteDevice(id: bigint, userId: bigint) {
 await db.execute(sql`INSERT INTO devices ...`);
 
 // ❌ Wrong — mutation logic inside a Server Action
-await db.insert(devicesTable).values(...); // belongs in src/data/, not in actions.ts
+await db.insert(devicesTable).values(...); // belongs in data/, not in actions.ts
 ```
 
 ### Scoping mutations to the current user
@@ -126,8 +126,8 @@ type ActionResult<T = void> =
 import { z } from 'zod';
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { getUserByClerkId } from '@/src/data/users';
-import { createDevice } from '@/src/data/devices';
+import { getUserByClerkId } from '@/data/users';
+import { createDevice } from '@/data/devices';
 
 const createDeviceSchema = z.object({
   name: z.string().min(1).max(100),
@@ -199,7 +199,7 @@ export function CreateDeviceForm() {
 
 Before writing any mutation code, verify:
 
-- [ ] The DB write lives in a `src/data/` helper using Drizzle ORM — no raw SQL
+- [ ] The DB write lives in a `data/` helper using Drizzle ORM — no raw SQL
 - [ ] The data helper scopes the write to the authenticated `userId`
 - [ ] The Server Action lives in a colocated `actions.ts` file with `'use server'` at the top
 - [ ] The Server Action parameter is a typed object — not `FormData`

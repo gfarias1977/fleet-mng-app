@@ -1,4 +1,4 @@
-# Database Coding Standards
+# 11 - Database Coding Standards
 
 ## Overview
 
@@ -10,14 +10,14 @@ This project uses **Drizzle ORM** exclusively for all database access. Raw SQL i
 
 - Use Drizzle ORM for every query (select, insert, update, delete).
 - Never use `db.execute(sql`...`)` or any raw SQL escape hatch.
-- Query logic belongs in `src/data/` helper functions — never inline in Server Actions or components.
+- Query logic belongs in `data/` helper functions — never inline in Server Actions or components.
 
 ```ts
-// ✅ Correct — Drizzle ORM
+// ✅ Correct — Drizzle ORM, using camelCase JS property
 const devices = await db
   .select()
   .from(devicesTable)
-  .where(eq(devicesTable.dev_user_id, userId));
+  .where(eq(devicesTable.userId, userId));
 
 // ❌ Wrong — raw SQL
 await db.execute(sql`SELECT * FROM devices WHERE dev_user_id = ${userId}`);
@@ -49,31 +49,43 @@ Each table uses a **3-letter prefix** for all its columns. This prevents ambigui
 
 | Table | Prefix |
 |-------|--------|
-| `users` | _(no prefix)_ |
+| `users` | _(no prefix — plain column names)_ |
 | `devices` | `dev_` |
-| `geofences` | `geo_` |
-| `alerts` | `alr_` |
-| `geofence_alert_rules` | `gar_` |
-| `device_geofence_assignments` | `dvg_` |
-| `tracking_events` | `tev_` |
-| `device_location_history` | `dvl_` |
+| `device_types` | `dvt_` |
 | `device_sensors` | `dvs_` |
-| `sensor_types` | `snt_` |
+| `device_location_history` | `dvl_` |
+| `geofences` | `geo_` |
+| `geofence_types` | `get_` |
+| `geofence_alert_rules` | `gar_` |
+| `asset_geofence_assignments` | `dvg_` |
+| `alerts` | `alr_` |
+| `alert_types` | `alt_` |
+| `alert_notifications` | `aln_` |
+| `assets` | `ass_` |
 | `asset_types` | `ast_` |
+| `sensors` | `sns_` |
+| `sensor_types` | `snt_` |
+| `telemetry_events` | `tev_` |
 
 ```ts
-// ✅ Correct — column names use table prefix
+// ✅ Correct — JS property is camelCase; DB column name uses the table prefix
 export const devicesTable = pgTable('devices', {
-  dev_id: bigserial('dev_id', { mode: 'bigint' }).primaryKey(),
-  dev_user_id: bigint('dev_user_id', { mode: 'bigint' }).notNull(),
-  dev_name: varchar('dev_name', { length: 100 }).notNull(),
-  dev_created_at: timestamp('dev_created_at').defaultNow().notNull(),
+  id: bigserial('dev_id', { mode: 'bigint' }).primaryKey(),
+  userId: bigint('dev_user_id', { mode: 'bigint' }).notNull(),
+  name: varchar('dev_name', { length: 100 }).notNull(),
+  createdAt: timestamp('dev_created_at').defaultNow().notNull(),
 });
 
-// ❌ Wrong — no prefix
+// ❌ Wrong — DB column names have no prefix
 export const devicesTable = pgTable('devices', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
+});
+
+// ❌ Wrong — JS property uses the prefixed column name instead of camelCase
+export const devicesTable = pgTable('devices', {
+  dev_id: bigserial('dev_id', { mode: 'bigint' }).primaryKey(),
+  dev_name: varchar('dev_name', { length: 100 }).notNull(),
 });
 ```
 
@@ -141,7 +153,7 @@ Do not modify `drizzle.config.ts` without understanding the impact on the migrat
 
 Before writing any database code, verify:
 
-- [ ] All DB writes go through a `src/data/` helper — not inline in actions or components
+- [ ] All DB writes go through a `data/` helper — not inline in actions or components
 - [ ] Drizzle ORM is used for every query — no raw SQL
 - [ ] New table columns follow the 3-letter prefix convention for that table
 - [ ] New schema files are exported from `src/db/schema/index.ts`

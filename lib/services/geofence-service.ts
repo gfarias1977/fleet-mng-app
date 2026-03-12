@@ -1,5 +1,5 @@
 import { db } from '@/src/db';
-import { deviceGeofenceAssignmentsTable, geofencesTable } from '@/src/db/schema';
+import { assetGeofenceAssignmentsTable, devicesTable, geofencesTable } from '@/src/db/schema';
 import { and, eq, isNull, lte, gte, or } from 'drizzle-orm';
 
 export interface GeofenceEvaluation {
@@ -51,30 +51,34 @@ async function getActiveAssignments(
 ): Promise<ActiveAssignment[]> {
   return db
     .select({
-      assignmentId: deviceGeofenceAssignmentsTable.id,
+      assignmentId: assetGeofenceAssignmentsTable.id,
       geofenceId: geofencesTable.id,
       geofenceName: geofencesTable.name,
       centerLatitude: geofencesTable.centerLatitude,
       centerLongitude: geofencesTable.centerLongitude,
       radiusMeters: geofencesTable.radiusMeters,
-      alertOnExit: deviceGeofenceAssignmentsTable.alertOnExit,
-      alertOnEntry: deviceGeofenceAssignmentsTable.alertOnEntry,
-      alertOnDwell: deviceGeofenceAssignmentsTable.alertOnDwell,
-      dwellTimeThreshold: deviceGeofenceAssignmentsTable.dwellTimeThreshold,
+      alertOnExit: assetGeofenceAssignmentsTable.alertOnExit,
+      alertOnEntry: assetGeofenceAssignmentsTable.alertOnEntry,
+      alertOnDwell: assetGeofenceAssignmentsTable.alertOnDwell,
+      dwellTimeThreshold: assetGeofenceAssignmentsTable.dwellTimeThreshold,
     })
-    .from(deviceGeofenceAssignmentsTable)
+    .from(devicesTable)
+    .innerJoin(
+      assetGeofenceAssignmentsTable,
+      eq(devicesTable.assetId, assetGeofenceAssignmentsTable.assetId)
+    )
     .innerJoin(
       geofencesTable,
-      eq(deviceGeofenceAssignmentsTable.geofenceId, geofencesTable.id)
+      eq(assetGeofenceAssignmentsTable.geofenceId, geofencesTable.id)
     )
     .where(
       and(
-        eq(deviceGeofenceAssignmentsTable.deviceId, deviceId),
-        eq(deviceGeofenceAssignmentsTable.isActive, true),
-        lte(deviceGeofenceAssignmentsTable.validFrom, at),
+        eq(devicesTable.id, deviceId),
+        eq(assetGeofenceAssignmentsTable.isActive, true),
+        lte(assetGeofenceAssignmentsTable.validFrom, at),
         or(
-          isNull(deviceGeofenceAssignmentsTable.validUntil),
-          gte(deviceGeofenceAssignmentsTable.validUntil, at)
+          isNull(assetGeofenceAssignmentsTable.validUntil),
+          gte(assetGeofenceAssignmentsTable.validUntil, at)
         ),
         eq(geofencesTable.active, true)
       )

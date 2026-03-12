@@ -1,4 +1,4 @@
-# Auth Coding Standards
+# 10 - Auth Coding Standards
 
 ## Provider
 
@@ -49,7 +49,9 @@ export default async function DashboardPage() {
 
 ### Bridging Clerk to the internal database user
 
-The internal `users` table stores app-specific data. Always resolve the Clerk ID to an internal user record via a `/data` helper before passing any ID to other data helpers:
+The internal `users` table stores app-specific data. Always resolve the Clerk ID to an internal user record via a `/data` helper before passing any ID to other data helpers.
+
+> **⚠️ Schema note:** The `users` table (`src/db/schema/users.ts`) does not yet have a `clerkId` column. Before implementing `getUserByClerkId`, add `clerkId: varchar('clerk_id', { length: 100 }).unique()` to the `usersTable` schema and run `npm run db:push`. Until then, user lookup can fall back to matching by `email` from Clerk's `currentUser()`.
 
 ```ts
 // data/users.ts
@@ -61,7 +63,7 @@ export async function getUserByClerkId(clerkId: string) {
   const [user] = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.clerkId, clerkId))
+    .where(eq(usersTable.clerkId, clerkId))  // requires clerkId column — see note above
     .limit(1);
 
   return user ?? null;

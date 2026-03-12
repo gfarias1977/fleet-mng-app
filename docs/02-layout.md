@@ -50,28 +50,22 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
-  Users, Shield, Package, Store, Tag,
-  FileText, CheckCircle, Search, LayoutDashboard,
+  LayoutDashboard,
+  Cpu,
+  BoxSelect,
+  MapPin,
+  Bell,
 } from 'lucide-react';
 
 const nav = [
   { label: 'Dashboard', href: '/', icon: LayoutDashboard },
   {
-    group: 'Aplicaciones',
+    group: 'Fleet',
     items: [
-      { label: 'Cartas', href: '/applications/cartas', icon: FileText },
-      { label: 'Validar Cartas', href: '/applications/validar-cartas', icon: CheckCircle },
-      { label: 'Buscar Cartas', href: '/applications/buscar-cartas', icon: Search },
-    ],
-  },
-  {
-    group: 'Administración',
-    items: [
-      { label: 'Usuarios', href: '/admin/users', icon: Users },
-      { label: 'Roles', href: '/admin/roles', icon: Shield },
-      { label: 'Aplicaciones', href: '/admin/aplicaciones', icon: Package },
-      { label: 'Proveedores', href: '/admin/proveedores', icon: Store },
-      { label: 'Category Managers', href: '/admin/category-managers', icon: Tag },
+      { label: 'Devices', href: '/devices', icon: Cpu },
+      { label: 'Assets', href: '/assets', icon: BoxSelect },
+      { label: 'Geofences', href: '/geofences', icon: MapPin },
+      { label: 'Alerts', href: '/alerts', icon: Bell },
     ],
   },
 ];
@@ -83,7 +77,7 @@ export function Sidebar() {
     <aside className="w-64 shrink-0 bg-sidebar-bg border-r border-border/10 flex flex-col overflow-y-auto">
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-border/10">
-        <span className="font-bold text-primary text-lg">geocercas</span>
+        <span className="font-bold text-primary text-lg">Fleet Manager</span>
       </div>
 
       {/* Nav */}
@@ -132,60 +126,26 @@ function NavItem({
 
 ## Header Component
 
-Topbar with user menu and theme toggle.
+Topbar with Clerk's `UserButton` for the user account menu.
 
 ```tsx
 // src/components/layout/Header.tsx
-'use client';
-import { Moon, Sun, LogOut, KeyRound } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useTheme } from '@/components/layout/ThemeProvider';
-import { useRouter } from 'next/navigation';
+import { UserButton } from '@clerk/nextjs';
 
 export function Header() {
-  const { theme, setTheme } = useTheme();
-  const router = useRouter();
-
   return (
     <header className="h-16 border-b border-border/10 bg-card flex items-center justify-between px-6 shrink-0">
       <div /> {/* breadcrumbs injected per page via PageContainer */}
 
       <div className="flex items-center gap-2">
-        {/* Theme toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
-
-        {/* User menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-xs font-bold">
-              U
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => router.push('/change-password')}>
-              <KeyRound className="mr-2 h-4 w-4" />
-              Cambiar contraseña
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/signin')}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Cerrar sesión
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <UserButton />
       </div>
     </header>
   );
 }
 ```
+
+Do not build a custom user menu or theme toggle in the Header. Use Clerk's `UserButton` for the account menu (see `docs/10-auth.md`).
 
 ---
 
@@ -249,19 +209,18 @@ export function PageContainer({ heading, breadcrumbs, children, className }: Pag
 ### Usage
 
 ```tsx
-
 import { PageContainer } from '@/components/layout/PageContainer';
-import CartasModule from '@/components/geofence/geofenceModule';
+import { DevicesModule } from '@/components/devices/DevicesModule';
 
-export default function CartasPage() {
+export default function DevicesPage() {
   return (
     <PageContainer
       breadcrumbs={[
-        { label: 'Inicio', href: '/' },
-        { label: 'Geofences' },
+        { label: 'Home', href: '/' },
+        { label: 'Devices' },
       ]}
     >
-      <CartasModule />
+      <DevicesModule />
     </PageContainer>
   );
 }
@@ -274,7 +233,6 @@ export default function CartasPage() {
 Just a Tailwind grid wrapper.
 
 ```tsx
-
 import { cn } from '@/lib/utils';
 
 export function GridContainer({

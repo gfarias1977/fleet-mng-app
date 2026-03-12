@@ -2,7 +2,7 @@
 
 ## Params and searchParams must be awaited
 
-This project uses **Next.js 15**, where `params` and `searchParams` are **Promises**. They must always be awaited before accessing any property. Failing to do so will cause a runtime error.
+This project uses **Next.js 16**, where `params` and `searchParams` are **Promises**. They must always be awaited before accessing any property. Failing to do so will cause a runtime error.
 
 ```tsx
 // ✅ Correct — params awaited
@@ -40,12 +40,12 @@ export default async function DevicePage({
 
 // ❌ Wrong — params accessed without awaiting
 export default async function DevicePage({ params }) {
-  const id = params.id; // runtime error in Next.js 15
+  const id = params.id; // runtime error in Next.js 16
 }
 
 // ❌ Wrong — destructured directly in the function signature
 export default async function DevicePage({ params: { id } }) {
-  // runtime error in Next.js 15
+  // runtime error in Next.js 16
 }
 ```
 

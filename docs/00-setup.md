@@ -1,129 +1,135 @@
-# 00 — Project Setup: Next.js 14 + shadcn/ui
+# 00 — Project Setup: Next.js 16 + shadcn/ui
+
+> **Note:** The project scaffold already exists. This document is a reference for the stack and conventions used.
+
+---
 
 ## Stack
 
-| Layer | Target (Next.js 16.x) |
-|---|---|---|
+| Layer | Target |
+|---|---|
 | Framework | Next.js 16 App Router |
+| Language | TypeScript 5 |
 | UI Library | shadcn/ui (Radix UI + Tailwind) |
-| Styling | Tailwind CSS + CSS variables |
-| State | Zustand or TanStack Query |
-| Routing | Next.js App Router (file-based) |
-| Forms | React Hook Form + Zod |
-| i18n | next-intl |
-| HTTP | axios (keep) or fetch + TanStack Query |
+| Styling | Tailwind CSS v4 (CSS-based config in `app/globals.css`) |
+| Auth | Clerk (`@clerk/nextjs` v7) |
+| Database | Neon Serverless Postgres via `@neondatabase/serverless` |
+| ORM | Drizzle ORM |
+| Forms | React Hook Form + Zod + `@hookform/resolvers` |
+| Icons | `lucide-react` |
 
 ---
 
-## Scaffold Commands
+## shadcn/ui configuration
+
+The project uses the **"new-york"** style with **slate** as the base color. Do not re-run `shadcn init` — it is already configured in `components.json`.
+
+To add new shadcn components:
 
 ```bash
-npx create-next-app@latest ccv-front --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
-cd ccv-front
-npx shadcn@latest init
+npx shadcn add <component-name>
 ```
 
-### shadcn/ui init answers
-```
-Which style? → Default
-Which base color? → Indigo  (matches current primary: indigo from MUI theme)
-CSS variables? → Yes
-```
-
-### Core shadcn components to install upfront
-
-```bash
-npx shadcn@latest add button input label select textarea badge
-npx shadcn@latest add table
-npx shadcn@latest add dialog alert-dialog
-npx shadcn@latest add dropdown-menu
-npx shadcn@latest add breadcrumb
-npx shadcn@latest add pagination
-npx shadcn@latest add form          # React Hook Form integration
-npx shadcn@latest add command       # for Combobox / Autocomplete
-npx shadcn@latest add popover       # needed by Combobox
-npx shadcn@latest add separator
-npx shadcn@latest add card
-npx shadcn@latest add sonner        # toasts (replaces redux fetchError alerts)
-```
+Current shadcn config (`components.json`): style = `new-york`, baseColor = `slate`, CSS variables enabled, `lucide-react` as the icon library, `@/` alias pointing to project root.
 
 ---
 
-## Folder Structure
+## Folder structure
 
 ```
 src/
 ├── app/                         # Next.js App Router
-│   ├── (auth)/                  # Route group: public pages
-│   │   ├── signin/page.tsx
-│   │   ├── forgot-password/page.tsx
-│   │   └── update-password/[validCode]/page.tsx
-│   ├── (dashboard)/             # Route group: authenticated pages
-│   │   ├── layout.tsx           # AppShell (sidebar + header)
-│   │   ├── page.tsx             # /  → dashboard / sample page
-│   │   ├── change-password/page.tsx
-│   │   ├── admin/
-│   │   │   ├── users/page.tsx
-│   │   │   ├── roles/page.tsx
-│   │   │   ├── aplicaciones/page.tsx
-│   │   │   ├── proveedores/page.tsx
-│   │   │   └── category-managers/page.tsx
-│   │   └── applications/
-│   │       ├── cartas/page.tsx
-│   │       ├── validar-cartas/page.tsx
-│   │       └── buscar-cartas/page.tsx
-├── components/
-│   ├── ui/                      # shadcn generated components (do not edit)
-│   ├── layout/                  # AppShell, Sidebar, Header, Breadcrumbs
-│   ├── data-table/              # Reusable DataTable system
-│   ├── crud/                    # ConfirmDialog, NoRecordFound, ExportButton
-│   └── [module]/                # Per-module: cartas/, users/, roles/, etc.
-├── lib/
-│   ├── axios.ts                 # Axios instance (replaces services/config)
-│   ├── auth.ts                  # Auth helpers / JWT
-│   └── utils.ts                 # shadcn cn() util + shared helpers
-├── hooks/                       # Custom hooks (useDebounce, etc.)
-├── store/                       # Zustand stores or TanStack Query config
-├── i18n/                        # next-intl messages
-└── types/                       # Shared TypeScript types
+│   ├── (auth)/                  # Public pages (sign-in, sign-up)
+│   └── (dashboard)/             # Authenticated pages
+│       ├── layout.tsx           # AppShell (Sidebar + Header)
+│       ├── page.tsx             # / → dashboard
+│       ├── devices/
+│       │   ├── page.tsx
+│       │   └── actions.ts
+│       ├── assets/
+│       │   ├── page.tsx
+│       │   └── actions.ts
+│       ├── geofences/
+│       │   ├── page.tsx
+│       │   └── actions.ts
+│       └── alerts/
+│           ├── page.tsx
+│           └── actions.ts
+├── db/
+│   ├── schema/                  # Drizzle table definitions (one file per entity)
+│   │   └── index.ts             # Re-exports all tables
+│   └── index.ts                 # Exports `db` client
+├── workers/
+│   └── mqtt-worker.ts           # Background MQTT consumer
+components/
+├── ui/                          # shadcn generated components (do not edit)
+├── layout/                      # AppShell, Sidebar, Header, PageContainer
+└── [module]/                    # Per-module components: devices/, assets/, etc.
+data/                            # Data helper functions (one file per entity)
+├── devices.ts
+├── assets.ts
+├── geofences.ts
+└── users.ts
+lib/
+└── utils.ts                     # cn() helper
+hooks/                           # Custom hooks
 ```
 
 ---
 
-## Environment Variables
+## Environment variables
 
-Copy `.env` pattern as `.env.local`:
+Copy `.env.example` to `.env.local`. Required variables:
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:8083/
-NEXT_PUBLIC_API_KEY=12345
-NEXT_PUBLIC_COMPANY_ID=1
-NEXT_PUBLIC_COMPANY_NAME="Salcobrand - Portal Cartas Corto Vence"
-NEXT_PUBLIC_SITE_KEY=<recaptcha_site_key>
-NEXT_PUBLIC_TIMEZONE=America/Santiago
-```
+# Clerk authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
 
-`NEXT_PUBLIC_*` in Next.js.
+# Database
+DATABASE_URL=postgres://...          # Neon serverless (production / default)
+LOCAL_DATABASE_URL=postgres://...    # Local Postgres (optional)
+USE_LOCAL_DB=false                   # Set to "true" to use LOCAL_DATABASE_URL
+
+# MQTT (optional, for the background worker)
+MQTT_BROKER_URL=mqtt://...
+MQTT_TOPIC=fleet/#
+```
 
 ---
 
-## Auth Guard (RestrictedRoute equivalent)
+## Auth guard (proxy.ts)
 
-In Next.js App Router, auth protection lives in `proxy.ts`:
+Next.js 16 uses `proxy.ts` (not `middleware.ts`) for request interception. The Clerk middleware is already configured:
 
 ```ts
-import { clerkMiddleware } from '@clerk/nextjs/server'
+// proxy.ts
+import { clerkMiddleware } from '@clerk/nextjs/server';
 
-export default clerkMiddleware()
+export default clerkMiddleware();
 
 export const config = {
   matcher: [
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     '/(api|trpc)(.*)',
   ],
-}
-
-export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
+```
+
+Do **not** create a `middleware.ts` file — it will not be picked up by Next.js 16.
+
+---
+
+## Database commands
+
+```bash
+npm run db:push       # Apply schema changes locally (dev only)
+npm run db:generate   # Generate SQL migration file
+npm run db:migrate    # Apply migration to target DB
+npm run db:studio     # Open Drizzle Studio
+npm run db:seed       # Run seed script
 ```

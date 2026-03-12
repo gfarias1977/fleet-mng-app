@@ -1,271 +1,155 @@
-# 04 — Forms & Dialogs: AddEdit Pattern
+# Forms Coding Standards
 
-Dialog pattern used across all CRUD modules.
+## Overview
 
----
-
-## Stack
-
-| Target |
-|---|
-| React Hook Form + Zod |
-| shadcn `Dialog` + `Input` + `Combobox` |
-| `form.formState.errors` |
+All forms use **react-hook-form** with **zodResolver** and **shadcn/ui Form components**. No other form pattern is permitted.
 
 ---
 
-## Install
+## Required installation
+
+Before creating any form, install the required packages if not already present:
 
 ```bash
-npm install react-hook-form zod @hookform/resolvers
+npm install react-hook-form @hookform/resolvers zod
+npx shadcn add form input label textarea select checkbox
 ```
 
 ---
 
-## Form Schema Pattern (Zod)
+## Mandatory pattern
 
-Define the validation schema separately from the component.
+Every form must follow this stack:
+
+1. **Zod schema** — defines and validates form shape
+2. **`useForm` + `zodResolver`** — connects schema to react-hook-form
+3. **shadcn `Form` components** — provides accessible, styled field wrappers
+4. **Server Action** — receives validated values; returns `{ success, error }`
+
+Never use uncontrolled `<form>` elements, raw `FormData`, or `useState` for field values.
+
+---
+
+## Schema placement
+
+- Define the Zod schema in the same file as the form component.
+- If the schema is reused across multiple files, extract it to a colocated `schemas.ts`.
 
 ```ts
-// src/components/cartas/carta.schema.ts
-import { z } from 'zod';
-
-export const cartaSchema = z.object({
-  ordenCompraId: z.string().min(1, 'Debe seleccionar una orden de compra'),
-  categoryManagerId: z.string().min(1, 'Debe seleccionar un Category Manager'),
-  tipoCategory: z.string().min(1, 'Debe seleccionar el tipo de categoría'),
-  politicaDevolucion: z.string().min(1, 'Debe ingresar la política de devolución'),
-  condicionesCanje: z.string().min(1, 'Debe ingresar las condiciones de canje'),
-  comentario: z.string().min(1, 'Debe ingresar un comentario'),
-  productos: z
-    .array(
-      z.object({
-        productoId: z.string(),
-        lote: z.string().min(1, 'El lote es requerido'),
-        cantidadUnitaria: z.number().positive('Cantidad debe ser mayor a 0'),
-        descuento: z.number().min(0).max(100),
-        fechaVencimiento: z.string().min(1, 'La fecha de vencimiento es requerida'),
-        plazoPagoAdicional: z.number().min(0),
-        canje: z.boolean(),
-      }),
-    )
-    .min(1, 'Debe seleccionar al menos un producto'),
-  fileCCV: z
-    .instanceof(File, { message: 'Debe adjuntar el archivo PDF' })
-    .refine((f) => f.type === 'application/pdf', 'Solo se aceptan archivos PDF')
-    .nullable(),
+// ✅ Same file — fine for single-use schemas
+const createDeviceSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  uuid: z.string().uuid('Must be a valid UUID'),
 });
 
-export type CartaFormValues = z.infer<typeof cartaSchema>;
+type CreateDeviceValues = z.infer<typeof createDeviceSchema>;
 ```
 
 ---
 
-## AddEditGeofence Dialog
+## Full example
 
 ```tsx
-// src/components/cartas/AddEditCarta.tsx
 'use client';
-import { useEffect } from 'react';
+
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Combobox } from '@/components/ui/combobox';  // see Combobox section below
-import { FileDropzone } from '@/components/crud/FileDropzone';
-import { cartaSchema, type CartaFormValues } from './carta.schema';
-import type { Carta } from '@/types/carta';
+import { createDeviceAction } from './actions';
 
-interface AddEditCartaProps {
-  open: boolean;
-  carta?: Carta | null;       // null = create, populated = edit
-  onClose: () => void;
-  onSaved: () => void;
-}
+const schema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  uuid: z.string().uuid('Must be a valid UUID'),
+});
 
-export function AddEditCarta({ open, carta, onClose, onSaved }: AddEditCartaProps) {
-  const form = useForm<CartaFormValues>({
-    resolver: zodResolver(cartaSchema),
-    defaultValues: {
-      ordenCompraId: '',
-      categoryManagerId: '',
-      tipoCategory: '',
-      politicaDevolucion: '',
-      condicionesCanje: '',
-      comentario: '',
-      productos: [],
-      fileCCV: null,
-    },
+type FormValues = z.infer<typeof schema>;
+
+export function CreateDeviceForm() {
+  const router = useRouter();
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: '', uuid: '' },
   });
 
-  // Populate form when editing
-  useEffect(() => {
-    if (carta) {
-      form.reset({
-        ordenCompraId: carta.ordenCompraId,
-        categoryManagerId: carta.categoryManagerId,
-        tipoCategory: carta.tipoCategory,
-        politicaDevolucion: carta.politicaDevolucion,
-        condicionesCanje: carta.condicionesCanje,
-        comentario: carta.comentario,
-        productos: carta.productos,
-        fileCCV: null,
-      });
-    } else {
-      form.reset();
+  async function onSubmit(values: FormValues) {
+    const result = await createDeviceAction(values);
+    if (!result.success) {
+      toast.error(result.error);
+      return;
     }
-  }, [carta, form]);
-
-  const onSubmit = async (values: CartaFormValues) => {
-    // dispatch create or update action
-    // await saveCarta(values);
-    onSaved();
-    onClose();
-  };
+    toast.success('Device created.');
+    router.push('/devices');
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{carta ? 'Edit Geofence' : 'New Geofence'}</DialogTitle>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-
-            {/* Section 1: Orden de Compra */}
-            <section>
-              <h3 className="text-h3 mb-3">Orden de Compra</h3>
-              <FormField
-                control={form.control}
-                name="ordenCompraId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Orden de Compra</FormLabel>
-                    <FormControl>
-                      <Combobox
-                        placeholder="Seleccionar orden..."
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        // options loaded from store / API
-                        options={[]}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </section>
-
-            {/* Section 2: Category Manager */}
-            <section>
-              <h3 className="text-h3 mb-3">Category Manager</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="categoryManagerId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category Manager</FormLabel>
-                      <FormControl>
-                        <Combobox
-                          placeholder="Seleccionar..."
-                          value={field.value}
-                          onValueChange={field.onChange}
-                          options={[]}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="tipoCategory"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tipo Categoría</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Tipo..." />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </section>
-
-            {/* Section 3: Otros Datos */}
-            <section>
-              <h3 className="text-h3 mb-3">Otros Datos</h3>
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="politicaDevolucion"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Política de Devolución</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} rows={3} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="condicionesCanje"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Condiciones de Canje</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} rows={3} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="fileCCV"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Archivo CCV (PDF)</FormLabel>
-                      <FormControl>
-                        <FileDropzone
-                          accept={{ 'application/pdf': ['.pdf'] }}
-                          onFileSelected={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </section>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input placeholder="My device" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="uuid"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>UUID</FormLabel>
+              <FormControl>
+                <Input placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? 'Creating…' : 'Create device'}
+        </Button>
+      </form>
+    </Form>
   );
 }
 ```
+
+---
+
+## Connecting to Server Actions
+
+Call the Server Action inside `form.handleSubmit`. The action returns `{ success: true, data }` or `{ success: false, error }` — handle both cases (see `docs/09-error-handling.md` for toast usage).
+
+```ts
+async function onSubmit(values: CreateDeviceValues) {
+  const result = await createDeviceAction(values);
+  if (!result.success) {
+    toast.error(result.error);
+    return;
+  }
+  toast.success('Device created.');
+  router.push('/devices');
+}
+```
+
+Never pass `FormData` to a Server Action. Pass the typed values object directly (aligns with `docs/14 - data-mutations.md`).
 
 ---
 
@@ -274,7 +158,7 @@ export function AddEditCarta({ open, carta, onClose, onSaved }: AddEditCartaProp
 shadcn doesn't ship a Combobox by default but provides a recipe using `Command` + `Popover`.
 
 ```tsx
-// src/components/ui/combobox.tsx
+// components/ui/combobox.tsx
 'use client';
 import { useState } from 'react';
 import { Check, ChevronsUpDown } from 'lucide-react';
@@ -296,8 +180,8 @@ interface ComboboxProps {
 }
 
 export function Combobox({
-  options, value, onValueChange, placeholder = 'Seleccionar...',
-  searchPlaceholder = 'Buscar...', emptyMessage = 'Sin resultados', disabled,
+  options, value, onValueChange, placeholder = 'Select...',
+  searchPlaceholder = 'Search...', emptyMessage = 'No results', disabled,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -340,52 +224,15 @@ export function Combobox({
 
 ---
 
-## FileDropzone Component
+## Checklist
 
-Replaces `react-dropzone` integration inside the current dialog.
+Before writing any form, verify:
 
-```tsx
-// src/components/crud/FileDropzone.tsx
-'use client';
-import { useCallback } from 'react';
-import { useDropzone, Accept } from 'react-dropzone';
-import { Upload } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-// npm install react-dropzone
-interface FileDropzoneProps {
-  accept?: Accept;
-  onFileSelected: (file: File | null) => void;
-  value?: File | null;
-}
-
-export function FileDropzone({ accept, onFileSelected, value }: FileDropzoneProps) {
-  const onDrop = useCallback((files: File[]) => {
-    onFileSelected(files[0] ?? null);
-  }, [onFileSelected]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop, accept, maxFiles: 1,
-  });
-
-  return (
-    <div
-      {...getRootProps()}
-      className={cn(
-        'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
-        isDragActive ? 'border-primary bg-accent' : 'border-border hover:border-primary/50',
-      )}
-    >
-      <input {...getInputProps()} />
-      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-      {value ? (
-        <p className="text-sm text-foreground">{value.name}</p>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          {isDragActive ? 'Suelta el archivo aquí' : 'Arrastra un PDF o haz clic para seleccionar'}
-        </p>
-      )}
-    </div>
-  );
-}
-```
+- [ ] `react-hook-form`, `@hookform/resolvers`, `zod`, and `sonner` are installed
+- [ ] shadcn form components are scaffolded (`npx shadcn add form input label ...`)
+- [ ] A Zod schema defines all field types and validation messages
+- [ ] `useForm` is initialized with `zodResolver(schema)`
+- [ ] `form.handleSubmit(onSubmit)` is used — not a native submit handler
+- [ ] The Server Action receives a typed values object — never `FormData`
+- [ ] Errors from `result.error` are shown via `toast.error()`
+- [ ] `FormMessage` is rendered inside each `FormItem` to display field-level errors

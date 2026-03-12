@@ -4,21 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Docs-first rule
 
-**Before generating any code, always check the `/docs` directory for a relevant standards file and follow it exactly.**
+> **MANDATORY: Before writing any code, read the relevant `/docs` file for the area you are working in. Do not generate code first and check docs after. The docs define the only acceptable pattern — no exceptions.**
+
+Use this table to find the right file:
 
 | Area | File |
 |------|------|
-| UI components & date formatting | `docs/ui.md` |
-| Data fetching, DB queries & user data isolation | `docs/data-fetching.md` |
-| Authentication & Clerk usage | `docs/auth.md` |
-| Data mutations, Server Actions & Zod validation | `docs/data-mutations.md` |
-| Server Components & async params | `docs/server-components.md` |
-| Forms (react-hook-form + zod + shadcn) | `docs/forms.md` |
-| Error handling (toast, error.tsx, loading.tsx) | `docs/error-handling.md` |
-| Database schema, migrations & naming | `docs/database.md` |
-| Environment variables | `docs/environment.md` |
+| UI components & date formatting | `docs/12-ui.md` |
+| Data fetching, DB queries & user data isolation | `docs/13-data-fetching.md` |
+| Authentication & Clerk usage | `docs/10-auth.md` |
+| Data mutations, Server Actions & Zod validation | `docs/14 - data-mutations.md` |
+| Server Components & async params | `docs/15 - server-components.md` |
+| Forms (react-hook-form + zod + shadcn) | `docs/04-forms.md` |
+| Error handling (toast, error.tsx, loading.tsx) | `docs/09-error-handling.md` |
+| Database schema, migrations & naming | `docs/11-database.md` |
+| Environment variables | `docs/07-environment.md` |
 
-If a `docs/` file covers the area you are working in, its rules are mandatory — they override any default behavior or general best practices.
+Rules:
+- If a `docs/` file covers the area you are working in, **read it before writing a single line of code**.
+- The docs override any default behavior, general best practices, or patterns learned from training data.
+- If the task spans multiple areas (e.g. a form that calls a Server Action that writes to the DB), read **all** relevant docs files before starting.
+- If you are unsure which doc applies, check the `/docs` directory and read the closest match.
 
 ## Commands
 
@@ -56,11 +62,26 @@ Next.js 16 uses `proxy.ts` (not `middleware.ts`) for request interception. The `
 
 `lib/utils.ts` exports `cn()` — a `clsx` + `tailwind-merge` helper for conditional className merging. Use it throughout all components.
 
-### Component conventions
+### Folder structure
 
-- UI primitives go in `components/ui/` (shadcn-managed)
-- Custom components go in `components/`
-- Hooks go in `hooks/`
-- Server-side utilities and DB logic go in `lib/`
+The project separates **Next.js frontend** (project root) from **backend infrastructure** (`src/`):
+
+| Folder | Purpose |
+|--------|---------|
+| `app/` | Next.js App Router — pages, layouts, Server Actions only. No business logic. |
+| `components/ui/` | shadcn-managed primitives — **never edit directly** |
+| `components/` | Custom React components (layout, AppShell, Sidebar, etc.) |
+| `data/` | Drizzle query/mutation helpers — called only from Server Components and Server Actions, never from Client Components |
+| `hooks/` | Custom React hooks (client-side only) |
+| `lib/utils.ts` | Only the `cn()` helper — do not add other utilities here |
+| `lib/services/` | Pure business logic shared between workers and Server Actions (no HTTP, no Next.js) |
+| `src/db/` | Drizzle schema, DB connection factory (`src/db/index.ts`), seed |
+| `src/workers/` | Independent Node.js background processes (MQTT, etc.) — not compiled by Next.js |
+
+### Data layer rules
+
+- `data/` helpers are the **only** place for Drizzle queries and mutations.
+- Server Actions (in colocated `actions.ts` files) call `data/` helpers — they never write DB logic inline.
+- Client Components never import from `data/` directly.
 
 

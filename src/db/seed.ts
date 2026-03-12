@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import * as readline from 'readline';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from './index';
 import {
   usersTable,
@@ -75,17 +75,16 @@ async function resolveGeofence(ctx: SeedContext) {
 
 async function seedAlertTypes(ctx: SeedContext): Promise<SeedContext> {
   console.log('\n🔔 Creando alert types...');
-  const [exitType] = await db.insert(alertTypesTable).values({
-    name: 'geofence_exit',
-    category: 'geofence',
-    description: 'Device has exited a monitored geofence',
-    priority: 2,
-    requiresAcknowledgment: true,
-    defaultMessage: 'Device exited geofence boundary',
-    isActive: true,
-  }).returning();
-
   await db.insert(alertTypesTable).values([
+    {
+      name: 'geofence_exit',
+      category: 'geofence',
+      description: 'Device has exited a monitored geofence',
+      priority: 2,
+      requiresAcknowledgment: true,
+      defaultMessage: 'Device exited geofence boundary',
+      isActive: true,
+    },
     {
       name: 'geofence_entry',
       category: 'geofence',
@@ -104,102 +103,143 @@ async function seedAlertTypes(ctx: SeedContext): Promise<SeedContext> {
       defaultMessage: 'Device dwelling inside geofence',
       isActive: true,
     },
-  ]);
-  console.log(`✅ Alert types creados: geofence_exit (ID: ${exitType.id}), geofence_entry, geofence_dwell`);
+  ]).onConflictDoNothing();
+  console.log('✅ Alert types: geofence_exit, geofence_entry, geofence_dwell');
   return ctx;
 }
 
-async function seedUsersAndDevices(ctx: SeedContext): Promise<SeedContext> {
+async function seedUsers(ctx: SeedContext): Promise<SeedContext> {
   console.log('\n👤 Creando usuario...');
-  const [user] = await db.insert(usersTable).values({
+  await db.insert(usersTable).values({
     name: 'Gabriel Farías',
     email: 'gabriel.farias@techforge.cl',
     phone: '+56912345678',
     active: true,
-  }).returning();
+  }).onConflictDoNothing();
+  const user = await resolveUser(ctx);
   console.log(`✅ Usuario: ${user.name} (ID: ${user.id})`);
+  return { ...ctx, user };
+}
 
-  console.log('📱 Creando device type...');
-  const [deviceType] = await db.insert(deviceTypesTable).values({
+async function seedSensors(ctx: SeedContext): Promise<SeedContext> {
+  console.log('\n🔧 Creando sensor types...');
+  await db.insert(sensorTypesTable).values([
+    { name: 'GPS Sensor',         description: 'Global Positioning System sensor for location tracking', isActive: true },
+    { name: 'Temperature Sensor', description: 'Digital temperature sensor', isActive: true },
+  ]).onConflictDoNothing();
+
+  const sensorTypes = await db
+    .select({ id: sensorTypesTable.id, name: sensorTypesTable.name })
+    .from(sensorTypesTable)
+    .where(inArray(sensorTypesTable.name, ['GPS Sensor', 'Temperature Sensor']));
+
+  const gpsSensorType  = sensorTypes.find((t) => t.name === 'GPS Sensor')!;
+  const tempSensorType = sensorTypes.find((t) => t.name === 'Temperature Sensor')!;
+
+  console.log('📡 Creando sensores...');
+  await db.insert(sensorTable).values([
+    { stId: gpsSensorType.id,  name: 'NEO-6M GPS Module',        status: 'active' },
+    { stId: tempSensorType.id, name: 'DS18B20 Temperature Sensor', status: 'active' },
+  ]).onConflictDoNothing();
+
+  console.log('✅ Sensores: NEO-6M GPS Module, DS18B20 Temperature Sensor');
+  return ctx;
+}
+
+async function seedDevices(ctx: SeedContext): Promise<SeedContext> {
+  const user = await resolveUser(ctx);
+
+  console.log('\n📱 Creando device type...');
+  await db.insert(deviceTypesTable).values({
     name: 'GPS Tracker Pro',
     description: 'Professional GPS tracking device with real-time location',
     capabilities: ['gps', 'gsm', 'accelerometer', 'temperature'],
     isActive: true,
-  }).returning();
+  }).onConflictDoNothing();
+  const [deviceType] = await db
+    .select({ id: deviceTypesTable.id })
+    .from(deviceTypesTable)
+    .where(eq(deviceTypesTable.name, 'GPS Tracker Pro'))
+    .limit(1);
 
-  console.log('🔧 Creando sensor types...');
-  const [gpsSensorType] = await db.insert(sensorTypesTable).values({
-    name: 'GPS Sensor',
-    description: 'Global Positioning System sensor for location tracking',
-    isActive: true,
-  }).returning();
-
-  const [tempSensorType] = await db.insert(sensorTypesTable).values({
-    name: 'Temperature Sensor',
-    description: 'Digital temperature sensor',
-    isActive: true,
-  }).returning();
-
-  console.log('📡 Creando sensores...');
-  const [gpsSensor] = await db.insert(sensorTable).values({
-    stId: gpsSensorType.id,
-    name: 'NEO-6M GPS Module',
-    status: 'active',
-  }).returning();
-
-  const [tempSensor] = await db.insert(sensorTable).values({
-    stId: tempSensorType.id,
-    name: 'DS18B20 Temperature Sensor',
-    status: 'active',
-  }).returning();
+  // Link to assets (use ctx.assets if available, otherwise query from DB)
+  const assets = ctx.assets ?? await db.select({ id: assetTable.id }).from(assetTable).limit(2);
+  const asset1Id = assets[0]?.id ?? null;
+  const asset2Id = assets[1]?.id ?? null;
 
   console.log('📟 Creando dispositivos...');
-  const [device1] = await db.insert(devicesTable).values({
-    userId: user.id,
-    deviceTypeId: deviceType.id,
-    serialNumber: 'SN-TRK-001',
-    name: 'Truck Fleet #001',
-    model: 'GT06N',
-    brand: 'Concox',
-    status: 'online',
-    active: true,
-  }).returning();
+  await db.insert(devicesTable).values([
+    {
+      userId: user.id,
+      deviceTypeId: deviceType.id,
+      serialNumber: 'SN-TRK-001',
+      name: 'Truck Fleet #001',
+      model: 'GT06N',
+      brand: 'Concox',
+      assetId: asset1Id ? BigInt(asset1Id) : null,
+      status: 'online',
+      active: true,
+    },
+    {
+      userId: user.id,
+      deviceTypeId: deviceType.id,
+      serialNumber: 'SN-VAN-042',
+      name: 'Delivery Van #042',
+      model: 'GT06N',
+      brand: 'Concox',
+      assetId: asset2Id ? BigInt(asset2Id) : null,
+      status: 'online',
+      active: true,
+    },
+  ]).onConflictDoNothing();
 
-  const [device2] = await db.insert(devicesTable).values({
-    userId: user.id,
-    deviceTypeId: deviceType.id,
-    serialNumber: 'SN-VAN-042',
-    name: 'Delivery Van #042',
-    model: 'GT06N',
-    brand: 'Concox',
-    status: 'online',
-    active: true,
-  }).returning();
+  const deviceRows = await db
+    .select({ id: devicesTable.id, name: devicesTable.name })
+    .from(devicesTable)
+    .where(inArray(devicesTable.serialNumber, ['SN-TRK-001', 'SN-VAN-042']));
+
+  const device1 = deviceRows.find((d) => d.name === 'Truck Fleet #001')!;
+  const device2 = deviceRows.find((d) => d.name === 'Delivery Van #042')!;
+
+  if (asset1Id && asset2Id) {
+    console.log(`  → ${device1.name} asignado a asset ID ${asset1Id}`);
+    console.log(`  → ${device2.name} asignado a asset ID ${asset2Id}`);
+  } else {
+    console.warn('  ⚠️  No se encontraron assets. Correr sección "Assets" primero para activar geofencing.');
+  }
 
   console.log('🔗 Asignando sensores a dispositivos...');
-  await db.insert(deviceSensorsTable).values([
-    { deviceId: device1.id, sensorId: gpsSensor.id, name: 'Primary GPS', enabled: true },
-    { deviceId: device1.id, sensorId: tempSensor.id, name: 'Cargo Temperature', enabled: true },
-    { deviceId: device2.id, sensorId: gpsSensor.id, name: 'Primary GPS', enabled: true },
-    { deviceId: device2.id, sensorId: tempSensor.id, name: 'Cargo Temperature', enabled: true },
-  ]);
+  const sensors = await db.select({ id: sensorTable.id }).from(sensorTable).limit(2);
+  if (sensors.length >= 2) {
+    await db.insert(deviceSensorsTable).values([
+      { deviceId: device1.id, sensorId: sensors[0].id, name: 'Primary GPS', enabled: true },
+      { deviceId: device1.id, sensorId: sensors[1].id, name: 'Cargo Temperature', enabled: true },
+      { deviceId: device2.id, sensorId: sensors[0].id, name: 'Primary GPS', enabled: true },
+      { deviceId: device2.id, sensorId: sensors[1].id, name: 'Cargo Temperature', enabled: true },
+    ]).onConflictDoNothing();
+  }
 
   console.log(`✅ Dispositivos: ${device1.name}, ${device2.name}`);
-  return { ...ctx, user, device1, device2 };
+  return { ...ctx, device1, device2 };
 }
 
 async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
   const user = await resolveUser(ctx);
 
   console.log('\n🗺️  Creando geofence type...');
-  const [geofenceType] = await db.insert(geofenceTypesTable).values({
+  await db.insert(geofenceTypesTable).values({
     name: 'Polygon Area',
     description: 'General polygon geofence',
     isActive: true,
-  }).returning();
+  }).onConflictDoNothing();
+  const [geofenceType] = await db
+    .select({ id: geofenceTypesTable.id })
+    .from(geofenceTypesTable)
+    .where(eq(geofenceTypesTable.name, 'Polygon Area'))
+    .limit(1);
 
   console.log('📍 Creando geocerca...');
-  const [geofence] = await db.insert(geofencesTable).values({
+  await db.insert(geofencesTable).values({
     userId: user.id,
     name: 'Zona de Distribución Las Condes',
     description: 'Área autorizada de distribución en Las Condes, Santiago',
@@ -208,7 +248,12 @@ async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
     centerLongitude: '-70.58',
     radiusMeters: '800',
     active: true,
-  }).returning();
+  }).onConflictDoNothing();
+  const [geofence] = await db
+    .select({ id: geofencesTable.id, name: geofencesTable.name })
+    .from(geofencesTable)
+    .where(eq(geofencesTable.name, 'Zona de Distribución Las Condes'))
+    .limit(1);
 
   console.log('🔗 Asignando assets a geocerca...');
   const assets = ctx.assets ?? await db.select({ id: assetTable.id }).from(assetTable).limit(2);
@@ -243,7 +288,7 @@ async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
       alertOnDwell: false,
       properties: { purpose: 'delivery', maxStayTime: 90 },
     },
-  ]);
+  ]).onConflictDoNothing();
 
   console.log(`✅ Geocerca: ${geofence.name}`);
   return { ...ctx, geofence };
@@ -270,34 +315,47 @@ async function seedTrackingEvents(ctx: SeedContext): Promise<SeedContext> {
 }
 
 async function seedAssetsAndTypes(ctx: SeedContext): Promise<SeedContext> {
-  console.log('\n🏗️  Creando asset types...');
-  const assetTypes = await db.insert(assetTypesTable).values([
-    { name: 'Vehículo Liviano',  status: 'active' },
-    { name: 'Camión',            status: 'active' },
-    { name: 'Maquinaria Pesada', status: 'active' },
-    { name: 'Motocicleta',       status: 'active' },
-    { name: 'Remolque',          status: 'active' },
-  ]).returning();
-  console.log(`✅ Asset types creados: ${assetTypes.map((t) => t.name).join(', ')}`);
+  const assetTypeNames = ['Vehículo Liviano', 'Camión', 'Maquinaria Pesada', 'Motocicleta', 'Remolque'];
 
-  const [car, truck, machinery, moto, trailer] = assetTypes;
+  console.log('\n🏗️  Creando asset types...');
+  await db.insert(assetTypesTable).values(
+    assetTypeNames.map((name) => ({ name, status: 'active' as const }))
+  ).onConflictDoNothing();
+
+  const assetTypes = await db
+    .select({ id: assetTypesTable.id, name: assetTypesTable.name })
+    .from(assetTypesTable)
+    .where(inArray(assetTypesTable.name, assetTypeNames));
+
+  const byName = Object.fromEntries(assetTypes.map((t) => [t.name, t.id]));
+  const car       = byName['Vehículo Liviano'];
+  const truck     = byName['Camión'];
+  const machinery = byName['Maquinaria Pesada'];
+  const moto      = byName['Motocicleta'];
+  const trailer   = byName['Remolque'];
 
   console.log('🚗 Creando assets...');
-  const insertedAssets = await db.insert(assetTable).values([
-    { assetTypeId: car.id,       number: 'ABC-123', status: 'active' },
-    { assetTypeId: car.id,       number: 'DEF-456', status: 'active' },
-    { assetTypeId: car.id,       number: 'GHI-789', status: 'inactive' },
-    { assetTypeId: truck.id,     number: 'CAM-001', status: 'active' },
-    { assetTypeId: truck.id,     number: 'CAM-002', status: 'active' },
-    { assetTypeId: truck.id,     number: 'CAM-003', status: 'active' },
-    { assetTypeId: machinery.id, number: 'MAQ-001', status: 'active' },
-    { assetTypeId: machinery.id, number: 'MAQ-002', status: 'inactive' },
-    { assetTypeId: moto.id,      number: 'MOT-001', status: 'active' },
-    { assetTypeId: moto.id,      number: 'MOT-002', status: 'active' },
-    { assetTypeId: trailer.id,   number: 'REM-001', status: 'active' },
-    { assetTypeId: trailer.id,   number: 'REM-002', status: 'inactive' },
-  ]).returning({ id: assetTable.id });
-  console.log('✅ Assets creados: 12 activos');
+  await db.insert(assetTable).values([
+    { assetTypeId: car,       number: 'ABC-123', status: 'active' },
+    { assetTypeId: car,       number: 'DEF-456', status: 'active' },
+    { assetTypeId: car,       number: 'GHI-789', status: 'inactive' },
+    { assetTypeId: truck,     number: 'CAM-001', status: 'active' },
+    { assetTypeId: truck,     number: 'CAM-002', status: 'active' },
+    { assetTypeId: truck,     number: 'CAM-003', status: 'active' },
+    { assetTypeId: machinery, number: 'MAQ-001', status: 'active' },
+    { assetTypeId: machinery, number: 'MAQ-002', status: 'inactive' },
+    { assetTypeId: moto,      number: 'MOT-001', status: 'active' },
+    { assetTypeId: moto,      number: 'MOT-002', status: 'active' },
+    { assetTypeId: trailer,   number: 'REM-001', status: 'active' },
+    { assetTypeId: trailer,   number: 'REM-002', status: 'inactive' },
+  ]).onConflictDoNothing();
+
+  const insertedAssets = await db
+    .select({ id: assetTable.id })
+    .from(assetTable)
+    .where(inArray(assetTable.number, ['ABC-123', 'DEF-456', 'GHI-789', 'CAM-001', 'CAM-002', 'CAM-003', 'MAQ-001', 'MAQ-002', 'MOT-001', 'MOT-002', 'REM-001', 'REM-002']));
+
+  console.log(`✅ Assets: ${insertedAssets.length} registros`);
   return { ...ctx, assets: insertedAssets };
 }
 
@@ -361,12 +419,14 @@ async function seedGeofenceAlertRules(ctx: SeedContext): Promise<SeedContext> {
 // ---------------------------------------------------------------------------
 
 const SECTIONS = [
-  { key: '1', label: 'Alert types',                       fn: seedAlertTypes },
-  { key: '2', label: 'Usuarios, dispositivos y sensores', fn: seedUsersAndDevices },
-  { key: '3', label: 'Assets y asset types',              fn: seedAssetsAndTypes },
-  { key: '4', label: 'Geocercas y asignaciones',          fn: seedGeofences },
-  { key: '5', label: 'Tracking events',                   fn: seedTrackingEvents },
-  { key: '6', label: 'Geofence alert rules',              fn: seedGeofenceAlertRules },
+  { key: '1', label: 'Alert types',          fn: seedAlertTypes },
+  { key: '2', label: 'Usuarios',             fn: seedUsers },
+  { key: '3', label: 'Sensores',             fn: seedSensors },
+  { key: '4', label: 'Dispositivos',         fn: seedDevices },
+  { key: '5', label: 'Assets y asset types', fn: seedAssetsAndTypes },
+  { key: '6', label: 'Geocercas',            fn: seedGeofences },
+  { key: '7', label: 'Tracking events',      fn: seedTrackingEvents },
+  { key: '8', label: 'Geofence alert rules', fn: seedGeofenceAlertRules },
 ] as const;
 
 function printMenu() {

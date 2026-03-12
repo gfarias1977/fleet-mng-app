@@ -20,10 +20,13 @@ export interface AlertRule {
   conditionType: string;
   cooldownPeriod: number;
   minimumDuration: number;
+  thresholdValue: string | null;
+  thresholdUnit: string | null;
   notifyUsers: string[];
   notificationChannels: string[];
   priority: number;
   alertTypeId: number;
+  active: boolean;
 }
 
 export async function loadGeofenceAlertRules(geofenceId: bigint): Promise<AlertRule[]> {
@@ -32,10 +35,13 @@ export async function loadGeofenceAlertRules(geofenceId: bigint): Promise<AlertR
       conditionType: geofenceAlertRulesTable.conditionType,
       cooldownPeriod: geofenceAlertRulesTable.cooldownPeriod,
       minimumDuration: geofenceAlertRulesTable.minimumDuration,
+      thresholdValue: geofenceAlertRulesTable.thresholdValue,
+      thresholdUnit: geofenceAlertRulesTable.thresholdUnit,
       notifyUsers: geofenceAlertRulesTable.notifyUsers,
       notificationChannels: geofenceAlertRulesTable.notificationChannels,
       priority: geofenceAlertRulesTable.priority,
       alertTypeId: geofenceAlertRulesTable.alertTypeId,
+      active: geofenceAlertRulesTable.active,
     })
     .from(geofenceAlertRulesTable)
     .where(eq(geofenceAlertRulesTable.geofenceId, geofenceId));
@@ -44,10 +50,13 @@ export async function loadGeofenceAlertRules(geofenceId: bigint): Promise<AlertR
     conditionType: r.conditionType ?? '',
     cooldownPeriod: r.cooldownPeriod ?? 0,
     minimumDuration: r.minimumDuration ?? 0,
+    thresholdValue: r.thresholdValue ?? null,
+    thresholdUnit: r.thresholdUnit ?? null,
     notifyUsers: (r.notifyUsers as string[]) ?? [],
     notificationChannels: (r.notificationChannels as string[]) ?? [],
     priority: r.priority ?? 1,
     alertTypeId: r.alertTypeId,
+    active: r.active ?? true,
   }));
 }
 

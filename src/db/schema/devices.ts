@@ -14,6 +14,7 @@ import { usersTable } from './users';
 import { deviceTypesTable } from './device-types';
 import { deviceSensorsTable } from './device-sensors';
 import { assetGeofenceAssignmentsTable } from './asset-geofence-assignments';
+import { assetTable } from './assets';
 import { telemetryEventsTable } from './telemetry_events';
 import { alertsTable } from './alerts';
 import { deviceLocationHistoryTable } from './device-location-history';
@@ -23,6 +24,7 @@ export const devicesTable = pgTable('devices', {
   serialNumber: varchar('serial_number', { length: 100 }).unique().notNull(),
   userId: bigint('dev_user_id', { mode: 'bigint' }).references(() => usersTable.id, { onDelete: 'cascade' }).notNull(),
   deviceTypeId: smallint('dev_dvt_id').references(() => deviceTypesTable.id).notNull(),
+  assetId: bigint('dev_ass_id', { mode: 'bigint' }).references(() => assetTable.id, { onDelete: 'set null' }),
 
   // Identification
   //uniqueIdentifier: varchar('dev_unique_identifier', { length: 100 }).unique().notNull(),
@@ -68,6 +70,7 @@ export const devicesTable = pgTable('devices', {
 export const devicesRelations = relations(devicesTable, ({ one, many }) => ({
   user: one(usersTable, { fields: [devicesTable.userId], references: [usersTable.id] }),
   deviceType: one(deviceTypesTable, { fields: [devicesTable.deviceTypeId], references: [deviceTypesTable.id] }),
+  asset: one(assetTable, { fields: [devicesTable.assetId], references: [assetTable.id] }),
   sensors: many(deviceSensorsTable),
   assignments: many(assetGeofenceAssignmentsTable),
   trackingEvents: many(telemetryEventsTable),
