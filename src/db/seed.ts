@@ -266,7 +266,7 @@ async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
   await db.insert(assetGeofenceAssignmentsTable).values([
     {
       geofenceId: geofence.id,
-      assetId: assets[0].id,
+      assetId: BigInt(assets[0].id),
       validFrom: now,
       validUntil,
       isActive: true,
@@ -278,7 +278,7 @@ async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
     },
     {
       geofenceId: geofence.id,
-      assetId: assets[1].id,
+      assetId: BigInt(assets[1].id),
       validFrom: now,
       validUntil,
       isActive: true,
