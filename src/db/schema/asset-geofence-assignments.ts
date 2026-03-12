@@ -15,13 +15,13 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import { geofencesTable } from './geofences';
-import { devicesTable } from './devices';
+import { assetTable } from './assets';
 
-export const deviceGeofenceAssignmentsTable = pgTable('device_geofence_assignments', {
+export const assetGeofenceAssignmentsTable = pgTable('asset_geofence_assignments', {
   id: bigserial('dvg_id', { mode: 'bigint' }).primaryKey(),
   uuid: uuid('dvg_uuid').defaultRandom().unique().notNull(),
   geofenceId: bigint('dvg_geo_id', { mode: 'bigint' }).references(() => geofencesTable.id, { onDelete: 'cascade' }).notNull(),
-  deviceId: bigint('dvg_dev_id', { mode: 'bigint' }).references(() => devicesTable.id, { onDelete: 'cascade' }).notNull(),
+  assetId: bigint('dvg_ass_id', { mode: 'bigint' }).references(() => assetTable.id, { onDelete: 'cascade' }).notNull(),
   
   // Assignment period
   validFrom: timestamp('dvg_valid_from', { withTimezone: true }).defaultNow().notNull(),
@@ -42,11 +42,11 @@ export const deviceGeofenceAssignmentsTable = pgTable('device_geofence_assignmen
   updatedAt: timestamp('dvg_updated_at', { withTimezone: true }).defaultNow(),
 }, (table) => ({
   // Indexes
-  deviceActiveIdx: index('idx_assignments_device_active').on(table.deviceId, table.isActive),
+  assetActiveIdx: index('idx_assignments_asset_active').on(table.assetId, table.isActive),
   geofenceActiveIdx: index('idx_assignments_geofence_active').on(table.geofenceId, table.isActive),
   
   // Unique constraint
-  uniqueAssignment: unique('unique_geofence_device').on(table.geofenceId, table.deviceId, table.validFrom),
+  uniqueAssignment: unique('unique_geofence_asset').on(table.geofenceId, table.assetId, table.validFrom),
   
   // Check constraint
   validPeriod: check('valid_period', sql`
@@ -54,7 +54,7 @@ export const deviceGeofenceAssignmentsTable = pgTable('device_geofence_assignmen
   `),
 }));
 
-export const deviceGeofenceAssignmentsRelations = relations(deviceGeofenceAssignmentsTable, ({ one }) => ({
-  geofence: one(geofencesTable, { fields: [deviceGeofenceAssignmentsTable.geofenceId], references: [geofencesTable.id] }),
-  device: one(devicesTable, { fields: [deviceGeofenceAssignmentsTable.deviceId], references: [devicesTable.id] }),
+export const assetGeofenceAssignmentsRelations = relations(assetGeofenceAssignmentsTable, ({ one }) => ({
+  geofence: one(geofencesTable, { fields: [assetGeofenceAssignmentsTable.geofenceId], references: [geofencesTable.id] }),
+  asset: one(assetTable, { fields: [assetGeofenceAssignmentsTable.assetId], references: [assetTable.id] }),
 }));

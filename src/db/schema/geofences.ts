@@ -17,7 +17,7 @@ import {
 import { relations, sql } from 'drizzle-orm';
 import { usersTable } from './users';
 import { geofenceTypesTable } from './geofence-types';
-import { deviceGeofenceAssignmentsTable } from './device-geofence-assignments';
+import { assetGeofenceAssignmentsTable } from './asset-geofence-assignments';
 import { alertsTable  } from './alerts';
 import { geofenceAlertRulesTable } from './geofence-alert-rules';
 
@@ -73,7 +73,7 @@ export const geofencesTable = pgTable('geofences', {
 export const geofencesRelations = relations(geofencesTable, ({ one, many }) => ({
   user: one(usersTable, { fields: [geofencesTable.userId], references: [usersTable.id] }),
   type: one(geofenceTypesTable, { fields: [geofencesTable.geofenceTypeId], references: [geofenceTypesTable.id] }),
-  assignments: many(deviceGeofenceAssignmentsTable),
+  assignments: many(assetGeofenceAssignmentsTable),
   alerts: many(alertsTable),
   alertRules: many(geofenceAlertRulesTable),
 }));

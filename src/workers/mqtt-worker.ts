@@ -3,7 +3,7 @@ import { db } from '../db';
 import { devicesTable, usersTable } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { createMqttBus, subscribe, startSimulator, GpsPayload } from './mock-mqtt';
-import { insertTrackingEvent } from '../../lib/services/tracking-service';
+import { insertTelemetryEvent } from '../../lib/services/telemetry-service';
 import { evaluateGeofencePositions } from '../../lib/services/geofence-service';
 import {
   resolveAlertTypeId,
@@ -127,7 +127,7 @@ async function handleGpsEvent(
   const timestamp = new Date(payload.timestamp);
 
   // Insert tracking event
-  const event = await insertTrackingEvent(
+  const event = await insertTelemetryEvent(
     device.id,
     payload.lat,
     payload.lng,
@@ -223,7 +223,7 @@ async function main(): Promise<void> {
   const devices = await db
     .select({
       id: devicesTable.id,
-      uuid: devicesTable.uuid,
+      uuid: devicesTable.serialNumber,
       name: devicesTable.name,
       userId: devicesTable.userId,
       userEmail: usersTable.email,

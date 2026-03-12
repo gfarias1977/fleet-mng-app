@@ -1,10 +1,9 @@
 // db/schema/devices.ts
 import { 
-  pgTable, 
-  bigserial, 
-  varchar, 
-  uuid, 
-  timestamp, 
+  pgTable,
+  bigserial,
+  varchar,
+  timestamp,
   boolean, 
   bigint,
   smallint,
@@ -14,21 +13,27 @@ import { relations } from 'drizzle-orm';
 import { usersTable } from './users';
 import { deviceTypesTable } from './device-types';
 import { deviceSensorsTable } from './device-sensors';
-import { deviceGeofenceAssignmentsTable } from './device-geofence-assignments';
-import { trackingEventsTable } from './tracking-events';
+import { assetGeofenceAssignmentsTable } from './asset-geofence-assignments';
+import { telemetryEventsTable } from './telemetry_events';
 import { alertsTable } from './alerts';
 import { deviceLocationHistoryTable } from './device-location-history';
 
 export const devicesTable = pgTable('devices', {
   id: bigserial('dev_id', { mode: 'bigint' }).primaryKey(),
-  uuid: uuid('dev_uuid').defaultRandom().unique().notNull(),
+  serialNumber: varchar('serial_number', { length: 100 }).unique().notNull(),
   userId: bigint('dev_user_id', { mode: 'bigint' }).references(() => usersTable.id, { onDelete: 'cascade' }).notNull(),
   deviceTypeId: smallint('dev_dvt_id').references(() => deviceTypesTable.id).notNull(),
-  
+
   // Identification
   //uniqueIdentifier: varchar('dev_unique_identifier', { length: 100 }).unique().notNull(),
   name: varchar('dev_name', { length: 100 }).notNull(),
   model: varchar('dev_model', { length: 50 }),
+  brand: varchar('dev_brand', { length: 50 }),
+
+  // Network
+  gateway: varchar('dev_gateway', { length: 100 }),
+  gatewayMacAddress: varchar('dev_gateway_mac_address', { length: 17 }),
+  macAddress: varchar('dev_mac_address', { length: 17 }),
   //manufacturer: varchar('dev_manufacturer', { length: 50 }),
   //firmwareVersion: varchar('dev_firmware_version', { length: 20 }),
   
@@ -64,8 +69,8 @@ export const devicesRelations = relations(devicesTable, ({ one, many }) => ({
   user: one(usersTable, { fields: [devicesTable.userId], references: [usersTable.id] }),
   deviceType: one(deviceTypesTable, { fields: [devicesTable.deviceTypeId], references: [deviceTypesTable.id] }),
   sensors: many(deviceSensorsTable),
-  assignments: many(deviceGeofenceAssignmentsTable),
-  trackingEvents: many(trackingEventsTable),
+  assignments: many(assetGeofenceAssignmentsTable),
+  trackingEvents: many(telemetryEventsTable),
   alerts: many(alertsTable),
   locationHistory: many(deviceLocationHistoryTable),
 }));

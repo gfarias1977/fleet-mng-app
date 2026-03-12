@@ -11,10 +11,12 @@ import {
   deviceSensorsTable,
   geofenceTypesTable,
   geofencesTable,
-  deviceGeofenceAssignmentsTable,
-  trackingEventsTable,
+  assetGeofenceAssignmentsTable,
+  telemetryEventsTable,
   alertTypesTable,
   geofenceAlertRulesTable,
+  assetTypesTable,
+  assetTable,
 } from './schema';
 
 // ---------------------------------------------------------------------------
@@ -26,6 +28,7 @@ type SeedContext = {
   device1?: { id: bigint; name: string };
   device2?: { id: bigint; name: string };
   geofence?: { id: bigint; name: string };
+  assets?: { id: number }[];
 };
 
 // ---------------------------------------------------------------------------
@@ -154,8 +157,10 @@ async function seedUsersAndDevices(ctx: SeedContext): Promise<SeedContext> {
   const [device1] = await db.insert(devicesTable).values({
     userId: user.id,
     deviceTypeId: deviceType.id,
+    serialNumber: 'SN-TRK-001',
     name: 'Truck Fleet #001',
     model: 'GT06N',
+    brand: 'Concox',
     status: 'online',
     active: true,
   }).returning();
@@ -163,8 +168,10 @@ async function seedUsersAndDevices(ctx: SeedContext): Promise<SeedContext> {
   const [device2] = await db.insert(devicesTable).values({
     userId: user.id,
     deviceTypeId: deviceType.id,
+    serialNumber: 'SN-VAN-042',
     name: 'Delivery Van #042',
     model: 'GT06N',
+    brand: 'Concox',
     status: 'online',
     active: true,
   }).returning();
@@ -183,7 +190,6 @@ async function seedUsersAndDevices(ctx: SeedContext): Promise<SeedContext> {
 
 async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
   const user = await resolveUser(ctx);
-  const { device1, device2 } = await resolveDevices(ctx);
 
   console.log('\n🗺️  Creando geofence type...');
   const [geofenceType] = await db.insert(geofenceTypesTable).values({
@@ -204,15 +210,18 @@ async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
     active: true,
   }).returning();
 
-  console.log('🔗 Asignando dispositivos a geocerca...');
+  console.log('🔗 Asignando assets a geocerca...');
+  const assets = ctx.assets ?? await db.select({ id: assetTable.id }).from(assetTable).limit(2);
+  if (assets.length < 2) throw new Error('Assets not found. Run section "Assets y asset types" first.');
+
   const now = new Date();
   const validUntil = new Date();
   validUntil.setMonth(validUntil.getMonth() + 6);
 
-  await db.insert(deviceGeofenceAssignmentsTable).values([
+  await db.insert(assetGeofenceAssignmentsTable).values([
     {
       geofenceId: geofence.id,
-      deviceId: device1.id,
+      assetId: assets[0].id,
       validFrom: now,
       validUntil,
       isActive: true,
@@ -224,7 +233,7 @@ async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
     },
     {
       geofenceId: geofence.id,
-      deviceId: device2.id,
+      assetId: assets[1].id,
       validFrom: now,
       validUntil,
       isActive: true,
@@ -245,19 +254,51 @@ async function seedTrackingEvents(ctx: SeedContext): Promise<SeedContext> {
 
   console.log('\n📊 Creando tracking events...');
   const device1Events = [
-    { deviceId: device1.id, eventTimestamp: new Date(Date.now() - 15 * 60 * 1000), latitude: '-33.41450000', longitude: '-70.58000000', altitude: '650.50' },
-    { deviceId: device1.id, eventTimestamp: new Date(Date.now() - 5 * 60 * 1000),  latitude: '-33.41500000', longitude: '-70.57850000', altitude: '655.20' },
-    { deviceId: device1.id, eventTimestamp: new Date(),                             latitude: '-33.41550000', longitude: '-70.57700000', altitude: '658.80' },
+    { deviceId: device1.id, eventTimestamp: new Date(Date.now() - 15 * 60 * 1000), latitude: '-33.41450000', longitude: '-70.58000000' },
+    { deviceId: device1.id, eventTimestamp: new Date(Date.now() - 5 * 60 * 1000),  latitude: '-33.41500000', longitude: '-70.57850000' },
+    { deviceId: device1.id, eventTimestamp: new Date(),                             latitude: '-33.41550000', longitude: '-70.57700000' },
   ];
   const device2Events = [
-    { deviceId: device2.id, eventTimestamp: new Date(Date.now() - 20 * 60 * 1000), latitude: '-33.41200000', longitude: '-70.58200000', altitude: '645.30' },
-    { deviceId: device2.id, eventTimestamp: new Date(Date.now() - 10 * 60 * 1000), latitude: '-33.41300000', longitude: '-70.57950000', altitude: '648.90' },
-    { deviceId: device2.id, eventTimestamp: new Date(),                             latitude: '-33.41400000', longitude: '-70.57800000', altitude: '652.50' },
+    { deviceId: device2.id, eventTimestamp: new Date(Date.now() - 20 * 60 * 1000), latitude: '-33.41200000', longitude: '-70.58200000' },
+    { deviceId: device2.id, eventTimestamp: new Date(Date.now() - 10 * 60 * 1000), latitude: '-33.41300000', longitude: '-70.57950000' },
+    { deviceId: device2.id, eventTimestamp: new Date(),                             latitude: '-33.41400000', longitude: '-70.57800000' },
   ];
 
-  await db.insert(trackingEventsTable).values([...device1Events, ...device2Events]);
+  await db.insert(telemetryEventsTable).values([...device1Events, ...device2Events]);
   console.log(`✅ Tracking events: ${device1Events.length + device2Events.length} eventos`);
   return ctx;
+}
+
+async function seedAssetsAndTypes(ctx: SeedContext): Promise<SeedContext> {
+  console.log('\n🏗️  Creando asset types...');
+  const assetTypes = await db.insert(assetTypesTable).values([
+    { name: 'Vehículo Liviano',  status: 'active' },
+    { name: 'Camión',            status: 'active' },
+    { name: 'Maquinaria Pesada', status: 'active' },
+    { name: 'Motocicleta',       status: 'active' },
+    { name: 'Remolque',          status: 'active' },
+  ]).returning();
+  console.log(`✅ Asset types creados: ${assetTypes.map((t) => t.name).join(', ')}`);
+
+  const [car, truck, machinery, moto, trailer] = assetTypes;
+
+  console.log('🚗 Creando assets...');
+  const insertedAssets = await db.insert(assetTable).values([
+    { assetTypeId: car.id,       number: 'ABC-123', status: 'active' },
+    { assetTypeId: car.id,       number: 'DEF-456', status: 'active' },
+    { assetTypeId: car.id,       number: 'GHI-789', status: 'inactive' },
+    { assetTypeId: truck.id,     number: 'CAM-001', status: 'active' },
+    { assetTypeId: truck.id,     number: 'CAM-002', status: 'active' },
+    { assetTypeId: truck.id,     number: 'CAM-003', status: 'active' },
+    { assetTypeId: machinery.id, number: 'MAQ-001', status: 'active' },
+    { assetTypeId: machinery.id, number: 'MAQ-002', status: 'inactive' },
+    { assetTypeId: moto.id,      number: 'MOT-001', status: 'active' },
+    { assetTypeId: moto.id,      number: 'MOT-002', status: 'active' },
+    { assetTypeId: trailer.id,   number: 'REM-001', status: 'active' },
+    { assetTypeId: trailer.id,   number: 'REM-002', status: 'inactive' },
+  ]).returning({ id: assetTable.id });
+  console.log('✅ Assets creados: 12 activos');
+  return { ...ctx, assets: insertedAssets };
 }
 
 async function seedGeofenceAlertRules(ctx: SeedContext): Promise<SeedContext> {
@@ -320,11 +361,12 @@ async function seedGeofenceAlertRules(ctx: SeedContext): Promise<SeedContext> {
 // ---------------------------------------------------------------------------
 
 const SECTIONS = [
-  { key: '1', label: 'Alert types',                   fn: seedAlertTypes },
+  { key: '1', label: 'Alert types',                       fn: seedAlertTypes },
   { key: '2', label: 'Usuarios, dispositivos y sensores', fn: seedUsersAndDevices },
-  { key: '3', label: 'Geocercas y asignaciones',      fn: seedGeofences },
-  { key: '4', label: 'Tracking events',               fn: seedTrackingEvents },
-  { key: '5', label: 'Geofence alert rules',          fn: seedGeofenceAlertRules },
+  { key: '3', label: 'Assets y asset types',              fn: seedAssetsAndTypes },
+  { key: '4', label: 'Geocercas y asignaciones',          fn: seedGeofences },
+  { key: '5', label: 'Tracking events',                   fn: seedTrackingEvents },
+  { key: '6', label: 'Geofence alert rules',              fn: seedGeofenceAlertRules },
 ] as const;
 
 function printMenu() {

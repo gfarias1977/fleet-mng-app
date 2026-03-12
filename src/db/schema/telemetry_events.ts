@@ -4,7 +4,8 @@ import {
   bigserial, 
   bigint, 
   timestamp, 
-  decimal, 
+  decimal,
+  jsonb,
   // geometry, // Commented - not using PostGIS
   index,
   primaryKey
@@ -13,7 +14,7 @@ import { relations } from 'drizzle-orm';
 import { devicesTable } from './devices';
 import { alertsTable } from './alerts';
 
-export const trackingEventsTable = pgTable('tracking_events', {
+export const telemetryEventsTable = pgTable('telemetry_events', {
   id: bigserial('tev_id', { mode: 'bigint' }).notNull(),
   deviceId: bigint('tev_device_id', { mode: 'bigint' }).references(() => devicesTable.id, { onDelete: 'cascade' }).notNull(),
   eventTimestamp: timestamp('tev_event_timestamp', { withTimezone: true }).notNull(),
@@ -24,7 +25,6 @@ export const trackingEventsTable = pgTable('tracking_events', {
   longitude: decimal('tev_longitude', { precision: 11, scale: 8 }).notNull(),
   
   // Movement data
-  altitude: decimal('tev_altitude', { precision: 7, scale: 2 }),
   //speed: decimal('tev_speed', { precision: 5, scale: 2 }),
   //heading: smallint('tev_heading'),
   
@@ -40,7 +40,7 @@ export const trackingEventsTable = pgTable('tracking_events', {
   //fixQuality: smallint('tev_fix_quality'),
   
   // Additional data
-  //additionalData: jsonb('tev_additional_data').default({}),
+  jsonData: jsonb('tev_json_data'),
   
   createdAt: timestamp('tev_created_at', { withTimezone: true }).defaultNow(),
 }, (table) => ({
@@ -48,17 +48,17 @@ export const trackingEventsTable = pgTable('tracking_events', {
   pk: primaryKey({ columns: [table.id, table.eventTimestamp] }),
   
   // Indexes
-  deviceTimeIdx: index('idx_tracking_events_device_time').on(table.deviceId, table.eventTimestamp),
-  //locationIdx: index('idx_tracking_events_location').using('gist', table.location),
-  timestampIdx: index('idx_tracking_events_timestamp').on(table.eventTimestamp),
-  brinIdx: index('idx_tracking_events_brin').using('brin', table.eventTimestamp),
-  //compositeIdx: index('idx_tracking_events_composite').on(table.deviceId, table.eventTimestamp, table.location),
+  deviceTimeIdx: index('idx_telemetry_events_device_time').on(table.deviceId, table.eventTimestamp),
+  //locationIdx: index('idx_telemetry_events_location').using('gist', table.location),
+  timestampIdx: index('idx_telemetry_events_timestamp').on(table.eventTimestamp),
+  brinIdx: index('idx_telemetry_events_brin').using('brin', table.eventTimestamp),
+  //compositeIdx: index('idx_telemetry_events_composite').on(table.deviceId, table.eventTimestamp, table.location),
   
   // Check constraint
   //headingCheck: check('heading_check', sql`${table.heading} BETWEEN 0 AND 360`),
 }));
 
-export const trackingEventsRelations = relations(trackingEventsTable, ({ one, many }) => ({
-  device: one(devicesTable, { fields: [trackingEventsTable.deviceId], references: [devicesTable.id] }),
+export const telemetryEventsRelations = relations(telemetryEventsTable, ({ one, many }) => ({
+  device: one(devicesTable, { fields: [telemetryEventsTable.deviceId], references: [devicesTable.id] }),
   alerts: many(alertsTable),
 }));

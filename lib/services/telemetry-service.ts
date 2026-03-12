@@ -1,5 +1,5 @@
 import { db } from '@/src/db';
-import { devicesTable, trackingEventsTable } from '@/src/db/schema';
+import { devicesTable, telemetryEventsTable } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function findDeviceByUuid(
@@ -14,7 +14,7 @@ export async function findDeviceByUuid(
   return device ?? null;
 }
 
-export async function insertTrackingEvent(
+export async function insertTelemetryEvent(
   deviceId: bigint,
   lat: number,
   lng: number,
@@ -22,7 +22,7 @@ export async function insertTrackingEvent(
   timestamp: Date
 ): Promise<{ id: bigint; eventTimestamp: Date }> {
   const [event] = await db
-    .insert(trackingEventsTable)
+    .insert(telemetryEventsTable)
     .values({
       deviceId,
       eventTimestamp: timestamp,

@@ -4,7 +4,7 @@ export * from './alert-types'; // Cambiado de 'alerts-types'
 export * from './alerts';
 export * from './asset-types';
 export * from './assets';
-export * from './device-geofence-assignments';
+export * from './asset-geofence-assignments';
 export * from './device-location-history'; // Cambiado de 'devices-locations-history'
 export * from './device-sensors'; // Cambiado de 'devices-sensors'
 export * from './device-types';
@@ -15,6 +15,6 @@ export * from './geofence-types'; // Cambiado de 'geofences-types'
 export * from './geofences';
 export * from './sensor-types'; // Añadir si existe
 export * from './sensors';
-export * from './tracking-events'; // Cambiado de 'tracking'
+export * from './telemetry_events'; // Cambiado de 'tracking'
 export * from './users';
 // Eliminar referencias a archivos que no existen: groups, locations, mqtt, relations
