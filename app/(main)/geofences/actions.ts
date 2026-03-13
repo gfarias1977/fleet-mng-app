@@ -1,16 +1,24 @@
 'use server';
 
 import { z } from 'zod';
-import { auth, currentUser } from '@clerk/nextjs/server'; // auth used in resolveUser
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { getUserByEmail } from '@/data/users';
 import {
   createGeofence,
   updateGeofence,
   deleteGeofence,
   getGeofenceMapData,
+  getGeofenceWithGeometry,
   type GeofenceRow,
   type GeofenceMapData,
+  type GeofenceWithGeometry,
 } from '@/data/geofences';
+import {
+  getAlertsByAssetAndGeofence,
+  getNotificationsByAssetAndGeofence,
+  type AlertRow,
+  type NotificationRow,
+} from '@/data/alerts';
 
 // ---------------------------------------------------------------------------
 // Shared result type
@@ -21,6 +29,44 @@ type ActionResult<T = void> =
   | { success: false; error: string };
 
 // ---------------------------------------------------------------------------
+// Geometry schemas
+// ---------------------------------------------------------------------------
+
+const circularGeometrySchema = z.object({
+  type: z.literal('circular'),
+  centerLatitude: z.string().min(1),
+  centerLongitude: z.string().min(1),
+  radiusMeters: z.string().min(1),
+});
+
+const polygonGeometrySchema = z.object({
+  type: z.literal('polygon'),
+  points: z
+    .array(
+      z.object({
+        latitude: z.string(),
+        longitude: z.string(),
+        pointOrder: z.number().int(),
+      })
+    )
+    .min(3, 'Polygon requires at least 3 points'),
+});
+
+const rectangularGeometrySchema = z.object({
+  type: z.literal('rectangular'),
+  nwLatitude: z.string().min(1),
+  nwLongitude: z.string().min(1),
+  seLatitude: z.string().min(1),
+  seLongitude: z.string().min(1),
+});
+
+const geometrySchema = z.discriminatedUnion('type', [
+  circularGeometrySchema,
+  polygonGeometrySchema,
+  rectangularGeometrySchema,
+]);
+
+// ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
 
@@ -28,18 +74,22 @@ const geofenceBaseSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().max(500).optional().nullable(),
   geofenceTypeId: z.coerce.number().int().positive('Type is required'),
-  centerLatitude: z.string().optional().nullable(),
-  centerLongitude: z.string().optional().nullable(),
-  radiusMeters: z.string().optional().nullable(),
   active: z.boolean().default(true),
+  geometry: geometrySchema,
 });
 
 const createGeofenceSchema = geofenceBaseSchema;
 const updateGeofenceSchema = geofenceBaseSchema.partial().extend({
   id: z.string(),
+  geometry: geometrySchema,
 });
 const deleteGeofenceSchema = z.object({ id: z.string() });
 const mapDataSchema = z.object({ id: z.string() });
+const geometryFetchSchema = z.object({ id: z.string() });
+const assetGeofenceSchema = z.object({
+  assetId: z.string().regex(/^\d+$/, 'assetId must be a numeric string'),
+  geofenceId: z.string().regex(/^\d+$/, 'geofenceId must be a numeric string'),
+});
 
 // ---------------------------------------------------------------------------
 // Auth helper
@@ -76,10 +126,8 @@ export async function createGeofenceAction(
     name: parsed.data.name,
     description: parsed.data.description,
     geofenceTypeId: parsed.data.geofenceTypeId,
-    centerLatitude: parsed.data.centerLatitude,
-    centerLongitude: parsed.data.centerLongitude,
-    radiusMeters: parsed.data.radiusMeters,
     active: parsed.data.active,
+    geometry: parsed.data.geometry,
   });
 
   return { success: true, data: geofence };
@@ -130,6 +178,62 @@ export async function getGeofenceMapDataAction(
   if (!user) return { success: false, error: 'User not found.' };
 
   const data = await getGeofenceMapData(BigInt(parsed.data.id), user.id);
+
+  return { success: true, data };
+}
+
+export async function getGeofenceWithGeometryAction(
+  input: z.infer<typeof geometryFetchSchema>
+): Promise<ActionResult<GeofenceWithGeometry | null>> {
+  const parsed = geometryFetchSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
+  }
+
+  const user = await resolveUser();
+  if (!user) return { success: false, error: 'User not found.' };
+
+  const data = await getGeofenceWithGeometry(BigInt(parsed.data.id), user.id);
+
+  return { success: true, data };
+}
+
+export async function getAlertsForAssetAction(
+  input: z.infer<typeof assetGeofenceSchema>
+): Promise<ActionResult<AlertRow[]>> {
+  const parsed = assetGeofenceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
+  }
+
+  const user = await resolveUser();
+  if (!user) return { success: false, error: 'User not found.' };
+
+  const data = await getAlertsByAssetAndGeofence(
+    Number(parsed.data.assetId),
+    BigInt(parsed.data.geofenceId),
+    user.id
+  );
+
+  return { success: true, data };
+}
+
+export async function getNotificationsForAssetAction(
+  input: z.infer<typeof assetGeofenceSchema>
+): Promise<ActionResult<NotificationRow[]>> {
+  const parsed = assetGeofenceSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
+  }
+
+  const user = await resolveUser();
+  if (!user) return { success: false, error: 'User not found.' };
+
+  const data = await getNotificationsByAssetAndGeofence(
+    Number(parsed.data.assetId),
+    BigInt(parsed.data.geofenceId),
+    user.id
+  );
 
   return { success: true, data };
 }

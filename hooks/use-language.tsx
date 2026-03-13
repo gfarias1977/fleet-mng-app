@@ -90,6 +90,16 @@ const translations = {
     'geofences.success.deleted': 'Geofence deleted successfully.',
     'geofences.map.title': 'Geofence Map',
     'geofences.map.noAssets': 'No assets assigned to this geofence.',
+    'geofences.map.polygon': 'Polygon',
+    'geofences.map.rectangle': 'Rectangle',
+    'geofences.col.geometry': 'Geometry',
+    'geofences.form.geometry.circular': 'Circular',
+    'geofences.form.geometry.polygon': 'Polygon',
+    'geofences.form.geometry.rectangular': 'Rectangular',
+    'geofences.form.searchAddress': 'Search address...',
+    'geofences.form.addPoint': 'Click map to add point',
+    'geofences.form.undoPoint': 'Undo last point',
+    'geofences.form.resetShape': 'Reset shape',
   },
   es: {
     // App
@@ -176,6 +186,16 @@ const translations = {
     'geofences.success.deleted': 'Geocerca eliminada exitosamente.',
     'geofences.map.title': 'Mapa de Geocerca',
     'geofences.map.noAssets': 'No hay activos asignados a esta geocerca.',
+    'geofences.map.polygon': 'Polígono',
+    'geofences.map.rectangle': 'Rectángulo',
+    'geofences.col.geometry': 'Geometría',
+    'geofences.form.geometry.circular': 'Circular',
+    'geofences.form.geometry.polygon': 'Polígono',
+    'geofences.form.geometry.rectangular': 'Rectangular',
+    'geofences.form.searchAddress': 'Buscar dirección...',
+    'geofences.form.addPoint': 'Haz clic en el mapa para agregar punto',
+    'geofences.form.undoPoint': 'Deshacer último punto',
+    'geofences.form.resetShape': 'Resetear figura',
   },
 } as const;
 

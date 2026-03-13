@@ -1,11 +1,19 @@
 import { db } from '@/src/db';
-import { assetGeofenceAssignmentsTable, devicesTable, geofencesTable } from '@/src/db/schema';
-import { and, eq, isNull, lte, gte, or } from 'drizzle-orm';
+import {
+  assetGeofenceAssignmentsTable,
+  devicesTable,
+  geofencesTable,
+  geofenceTypesTable,
+  geofencePolygonPointsTable,
+  geofenceRectanglesTable,
+} from '@/src/db/schema';
+import { and, eq, isNull, lte, gte, or, asc } from 'drizzle-orm';
 
 export interface GeofenceEvaluation {
   assignmentId: bigint;
   geofenceId: bigint;
   geofenceName: string;
+  geofenceTypeName: string;
   distanceMeters: number;
   radiusMeters: number;
   isInside: boolean;
@@ -32,10 +40,41 @@ export function haversineDistanceMeters(
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(a));
 }
 
+// Ray-casting algorithm: point inside polygon
+function isInsidePolygon(
+  lat: number,
+  lng: number,
+  points: { lat: number; lng: number }[]
+): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const xi = points[i].lat, yi = points[i].lng;
+    const xj = points[j].lat, yj = points[j].lng;
+    const intersects =
+      yi > lng !== yj > lng &&
+      lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+// Bounding box check for rectangular geofence
+function isInsideRectangle(
+  lat: number,
+  lng: number,
+  nwLat: number,
+  nwLng: number,
+  seLat: number,
+  seLng: number
+): boolean {
+  return lat <= nwLat && lat >= seLat && lng >= nwLng && lng <= seLng;
+}
+
 interface ActiveAssignment {
   assignmentId: bigint;
   geofenceId: bigint;
   geofenceName: string;
+  typeName: string;
   centerLatitude: string | null;
   centerLongitude: string | null;
   radiusMeters: string | null;
@@ -54,6 +93,7 @@ async function getActiveAssignments(
       assignmentId: assetGeofenceAssignmentsTable.id,
       geofenceId: geofencesTable.id,
       geofenceName: geofencesTable.name,
+      typeName: geofenceTypesTable.name,
       centerLatitude: geofencesTable.centerLatitude,
       centerLongitude: geofencesTable.centerLongitude,
       radiusMeters: geofencesTable.radiusMeters,
@@ -70,6 +110,10 @@ async function getActiveAssignments(
     .innerJoin(
       geofencesTable,
       eq(assetGeofenceAssignmentsTable.geofenceId, geofencesTable.id)
+    )
+    .innerJoin(
+      geofenceTypesTable,
+      eq(geofencesTable.geofenceTypeId, geofenceTypesTable.id)
     )
     .where(
       and(
@@ -95,20 +139,66 @@ export async function evaluateGeofencePositions(
   const evaluations: GeofenceEvaluation[] = [];
 
   for (const a of assignments) {
-    if (!a.centerLatitude || !a.centerLongitude || !a.radiusMeters) continue;
+    const typeName = a.typeName.toLowerCase();
+    let isInside = false;
+    let distanceMeters = 0;
+    let radiusMeters = 0;
 
-    const centerLat = parseFloat(a.centerLatitude);
-    const centerLng = parseFloat(a.centerLongitude);
-    const radius = parseFloat(a.radiusMeters);
-    const distance = haversineDistanceMeters(lat, lng, centerLat, centerLng);
-    const isInside = distance <= radius;
+    if (typeName === 'circular') {
+      if (!a.centerLatitude || !a.centerLongitude || !a.radiusMeters) continue;
+      const centerLat = parseFloat(a.centerLatitude);
+      const centerLng = parseFloat(a.centerLongitude);
+      radiusMeters = parseFloat(a.radiusMeters);
+      distanceMeters = haversineDistanceMeters(lat, lng, centerLat, centerLng);
+      isInside = distanceMeters <= radiusMeters;
+
+    } else if (typeName === 'polygon') {
+      const rows = await db
+        .select({
+          lat: geofencePolygonPointsTable.latitude,
+          lng: geofencePolygonPointsTable.longitude,
+        })
+        .from(geofencePolygonPointsTable)
+        .where(eq(geofencePolygonPointsTable.geofenceId, a.geofenceId))
+        .orderBy(asc(geofencePolygonPointsTable.pointOrder));
+
+      if (rows.length < 3) continue;
+      const pts = rows.map((r) => ({ lat: parseFloat(r.lat), lng: parseFloat(r.lng) }));
+      isInside = isInsidePolygon(lat, lng, pts);
+
+    } else if (typeName === 'rectangular') {
+      const [rect] = await db
+        .select({
+          nwLat: geofenceRectanglesTable.nwLatitude,
+          nwLng: geofenceRectanglesTable.nwLongitude,
+          seLat: geofenceRectanglesTable.seLatitude,
+          seLng: geofenceRectanglesTable.seLongitude,
+        })
+        .from(geofenceRectanglesTable)
+        .where(eq(geofenceRectanglesTable.geofenceId, a.geofenceId))
+        .limit(1);
+
+      if (!rect) continue;
+      isInside = isInsideRectangle(
+        lat, lng,
+        parseFloat(rect.nwLat),
+        parseFloat(rect.nwLng),
+        parseFloat(rect.seLat),
+        parseFloat(rect.seLng)
+      );
+
+    } else {
+      // Unknown type — skip silently
+      continue;
+    }
 
     evaluations.push({
       assignmentId: a.assignmentId,
       geofenceId: a.geofenceId,
       geofenceName: a.geofenceName,
-      distanceMeters: distance,
-      radiusMeters: radius,
+      geofenceTypeName: typeName,
+      distanceMeters,
+      radiusMeters,
       isInside,
       alertOnExit: a.alertOnExit ?? false,
       alertOnEntry: a.alertOnEntry ?? false,

@@ -201,15 +201,7 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
               <TableHead>
                 <SortableHeader field="description">Description</SortableHeader>
               </TableHead>
-              <TableHead>
-                <SortableHeader field="centerLatitude">Center Lat</SortableHeader>
-              </TableHead>
-              <TableHead>
-                <SortableHeader field="centerLongitude">Center Lng</SortableHeader>
-              </TableHead>
-              <TableHead>
-                <SortableHeader field="radiusMeters">Radius (m)</SortableHeader>
-              </TableHead>
+              <TableHead>Geometry</TableHead>
               <TableHead>
                 <SortableHeader field="active">Active</SortableHeader>
               </TableHead>
@@ -225,7 +217,7 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
                   No geofences found.
                 </TableCell>
               </TableRow>
@@ -241,9 +233,7 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
                         : geo.description
                       : '—'}
                   </TableCell>
-                  <TableCell>{geo.centerLatitude ?? '—'}</TableCell>
-                  <TableCell>{geo.centerLongitude ?? '—'}</TableCell>
-                  <TableCell>{geo.radiusMeters ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{geo.geometrySummary || '—'}</TableCell>
                   <TableCell>
                     <Badge variant={geo.active ? 'default' : 'secondary'}>
                       {geo.active ? 'Yes' : 'No'}
