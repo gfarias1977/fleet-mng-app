@@ -211,7 +211,10 @@ async function handleGpsEvent(
     const prevState  = geofenceStateMap.get(stateKey) ?? null;
     const currInside = ev.isInside;
 
-    console.log(`  ↳ [${ev.geofenceName}] dist: ${ev.distanceMeters.toFixed(0)}m / radius: ${ev.radiusMeters}m → ${currInside ? 'INSIDE' : 'OUTSIDE'}`);
+    const locInfo = ev.geofenceTypeName === 'circular'
+      ? `dist: ${ev.distanceMeters.toFixed(0)}m / radius: ${ev.radiusMeters}m`
+      : `type: ${ev.geofenceTypeName}`;
+    console.log(`  ↳ [${ev.geofenceName}] ${locInfo} → ${currInside ? 'INSIDE' : 'OUTSIDE'}`);
 
     // First tick: establish baseline
     if (prevState === null) {
@@ -228,7 +231,10 @@ async function handleGpsEvent(
     if (!prevState && currInside) {
       entryTimeMap.set(stateKey, timestamp);
       if (ev.alertOnEntry) {
-        const message = `Device '${device.name}' entered geofence '${ev.geofenceName}'. Distance: ${ev.distanceMeters.toFixed(0)}m (radius: ${ev.radiusMeters}m)`;
+        const geoDetail = ev.geofenceTypeName === 'circular'
+          ? `. Distance: ${ev.distanceMeters.toFixed(0)}m (radius: ${ev.radiusMeters}m)`
+          : '';
+        const message = `Device '${device.name}' entered geofence '${ev.geofenceName}'${geoDetail}`;
         console.log(`  ✅ ENTRY: '${device.name}' → '${ev.geofenceName}'`);
         await fireAlert('boundary_entry', device, ev.geofenceId, ev.geofenceName, event.id, payload.lat, payload.lng, timestamp, message, rules);
         await updateDeviceStatus(device.id, 'active');
@@ -239,7 +245,10 @@ async function handleGpsEvent(
     if (prevState && !currInside) {
       entryTimeMap.delete(stateKey);
       if (ev.alertOnExit) {
-        const message = `Device '${device.name}' exited geofence '${ev.geofenceName}'. Distance: ${ev.distanceMeters.toFixed(0)}m (radius: ${ev.radiusMeters}m)`;
+        const geoDetail = ev.geofenceTypeName === 'circular'
+          ? `. Distance: ${ev.distanceMeters.toFixed(0)}m (radius: ${ev.radiusMeters}m)`
+          : '';
+        const message = `Device '${device.name}' exited geofence '${ev.geofenceName}'${geoDetail}`;
         console.log(`  🚨 EXIT: '${device.name}' → '${ev.geofenceName}'`);
         await fireAlert('boundary_exit', device, ev.geofenceId, ev.geofenceName, event.id, payload.lat, payload.lng, timestamp, message, rules);
         await updateDeviceStatus(device.id, 'alert');

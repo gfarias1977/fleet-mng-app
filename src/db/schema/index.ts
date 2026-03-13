@@ -13,6 +13,8 @@ export * from './enums';
 export * from './geofence-alert-rules'; // Cambiado de 'geofences-alerts-rules'
 export * from './geofence-types'; // Cambiado de 'geofences-types'
 export * from './geofences';
+export * from './geofence-polygon-points';
+export * from './geofence-rectangles';
 export * from './sensor-types'; // Añadir si existe
 export * from './sensors';
 export * from './telemetry_events'; // Cambiado de 'tracking'
