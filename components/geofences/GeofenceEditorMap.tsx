@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, LayersControl, Circle, Polygon, Rectangle, Marker, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Circle, Polygon, Rectangle, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
@@ -130,6 +130,7 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
   const [addressInput, setAddressInput] = useState('');
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
+  const [tileLayer, setTileLayer] = useState<'default' | 'satellite'>('default');
 
   async function handleAddressSearch() {
     const q = addressInput.trim();
@@ -242,26 +243,23 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
       </div>
 
       {/* Map */}
-      <div className="flex-1 min-h-0 rounded-md overflow-hidden border" style={{ minHeight: '350px' }}>
+      <div className="relative flex-1 min-h-0 rounded-md overflow-hidden border" style={{ minHeight: '350px' }}>
         <MapContainer
           center={[20, 0]}
           zoom={2}
           style={{ height: '100%', width: '100%' }}
         >
-          <LayersControl position="topright">
-            <LayersControl.BaseLayer checked name="Default">
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-            </LayersControl.BaseLayer>
-            <LayersControl.BaseLayer name="Satellite">
-              <TileLayer
-                attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              />
-            </LayersControl.BaseLayer>
-          </LayersControl>
+          {tileLayer === 'default' ? (
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          ) : (
+            <TileLayer
+              attribution='Tiles &copy; Esri'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            />
+          )}
 
           <CenterOnInitialGeometry initialValue={initialValue} />
 
@@ -325,6 +323,14 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
             <Marker position={[value.seLat, value.seLng]} />
           )}
         </MapContainer>
+        <button
+          type="button"
+          onClick={() => setTileLayer(t => t === 'default' ? 'satellite' : 'default')}
+          className="absolute top-2 right-2 z-[1001] bg-white rounded shadow px-2 py-1 text-xs font-medium border border-gray-200 hover:bg-gray-50 cursor-pointer"
+          title="Toggle map layer"
+        >
+          {tileLayer === 'default' ? 'Satellite' : 'Default'}
+        </button>
       </div>
     </div>
   );
