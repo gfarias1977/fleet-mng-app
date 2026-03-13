@@ -124,3 +124,51 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Leaflet controls — fix Tailwind v4 preflight reset ─────────────────── */
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-left,
+.leaflet-right {
+  position: absolute;
+  z-index: 1000;
+  pointer-events: none;
+}
+.leaflet-top    { top: 0; }
+.leaflet-bottom { bottom: 0; }
+.leaflet-left   { left: 0; }
+.leaflet-right  { right: 0; }
+
+.leaflet-control {
+  position: relative;
+  z-index: 800;
+  pointer-events: visiblePainted;
+  pointer-events: auto;
+  float: left;
+  clear: both;
+}
+.leaflet-right .leaflet-control { float: right; }
+
+.leaflet-top    .leaflet-control { margin-top:    10px; }
+.leaflet-bottom .leaflet-control { margin-bottom: 10px; }
+.leaflet-left   .leaflet-control { margin-left:   10px; }
+.leaflet-right  .leaflet-control { margin-right:  10px; }
+
+.leaflet-control-layers {
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  border-radius: 5px;
+}
+.leaflet-control-layers-toggle {
+  background-image: url(https://unpkg.com/leaflet@1.9.4/dist/images/layers.png);
+  width: 36px;
+  height: 36px;
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+}
+@media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 1.5dppx) {
+  .leaflet-control-layers-toggle {
+    background-image: url(https://unpkg.com/leaflet@1.9.4/dist/images/layers-2x.png);
+    background-size: 26px 26px;
+  }
+}
