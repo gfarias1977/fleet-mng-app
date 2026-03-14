@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, LayersControl, Circle, Polygon, Rectangle, Marker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useRef, useState } from 'react';
+import { MapContainer, TileLayer, Circle, Polygon, Rectangle, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GeofenceMapData } from '@/data/geofences';
@@ -58,6 +58,7 @@ interface Props {
 export default function GeofenceMap({ data, flyToAsset }: Props) {
   const { geofence, assets } = data;
   const { geometry } = geofence;
+  const [tileLayer, setTileLayer] = useState<'default' | 'satellite'>('default');
 
   // Compute initial map center and zoom
   let center: [number, number] = [20, 0];
@@ -90,25 +91,23 @@ export default function GeofenceMap({ data, flyToAsset }: Props) {
   }
 
   return (
+    <div style={{ position: 'relative', height: '400px', width: '100%', borderRadius: '0.375rem' }}>
     <MapContainer
       center={center}
       zoom={zoom}
-      style={{ height: '400px', width: '100%', borderRadius: '0.375rem' }}
+      style={{ height: '100%', width: '100%', borderRadius: '0.375rem' }}
     >
-      <LayersControl position="topright">
-        <LayersControl.BaseLayer checked name="Default">
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-        </LayersControl.BaseLayer>
-        <LayersControl.BaseLayer name="Satellite">
-          <TileLayer
-            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-          />
-        </LayersControl.BaseLayer>
-      </LayersControl>
+      {tileLayer === 'default' ? (
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+      ) : (
+        <TileLayer
+          attribution='Tiles &copy; Esri'
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        />
+      )}
 
       {fitBounds && <FitBounds bounds={fitBounds} />}
       <FlyToAsset target={flyToAsset} />
@@ -162,5 +161,14 @@ export default function GeofenceMap({ data, flyToAsset }: Props) {
         </Marker>
       ))}
     </MapContainer>
+    <button
+      type="button"
+      onClick={() => setTileLayer(t => t === 'default' ? 'satellite' : 'default')}
+      className="absolute top-2 right-2 z-[1001] bg-white rounded shadow px-2 py-1 text-xs font-medium border border-gray-200 hover:bg-gray-50 cursor-pointer"
+      title="Toggle map layer"
+    >
+      {tileLayer === 'default' ? 'Satellite' : 'Default'}
+    </button>
+    </div>
   );
 }
