@@ -12,6 +12,7 @@ import {
   Trash2,
   MapPin,
   Plus,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ import type { PaginatedResult, GeofenceRow, GeofenceSortField } from '@/data/geo
 import { GeofenceFormDialog } from './GeofenceFormDialog';
 import { DeleteGeofenceDialog } from './DeleteGeofenceDialog';
 import { GeofenceMapDialog } from './GeofenceMapDialog';
+import { AssetAssignmentsDialog } from './AssetAssignmentsDialog';
 
 interface Props {
   initialData: PaginatedResult<GeofenceRow>;
@@ -66,6 +68,12 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
   }>({ open: false, geofence: null });
 
   const [mapDialog, setMapDialog] = useState<{
+    open: boolean;
+    geofenceId: string | null;
+    geofenceName: string;
+  }>({ open: false, geofenceId: null, geofenceName: '' });
+
+  const [assignmentsDialog, setAssignmentsDialog] = useState<{
     open: boolean;
     geofenceId: string | null;
     geofenceName: string;
@@ -246,6 +254,20 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
                       <Button
                         variant="ghost"
                         size="icon"
+                        title="Asset Assignments"
+                        onClick={() =>
+                          setAssignmentsDialog({
+                            open: true,
+                            geofenceId: String(geo.id),
+                            geofenceName: geo.name,
+                          })
+                        }
+                      >
+                        <Users className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         title="Edit"
                         onClick={() => setFormDialog({ open: true, geofence: geo })}
                       >
@@ -367,6 +389,13 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
         geofenceId={mapDialog.geofenceId}
         geofenceName={mapDialog.geofenceName}
         onClose={() => setMapDialog({ open: false, geofenceId: null, geofenceName: '' })}
+      />
+
+      <AssetAssignmentsDialog
+        open={assignmentsDialog.open}
+        geofenceId={assignmentsDialog.geofenceId}
+        geofenceName={assignmentsDialog.geofenceName}
+        onClose={() => setAssignmentsDialog({ open: false, geofenceId: null, geofenceName: '' })}
       />
     </div>
   );
