@@ -7,6 +7,8 @@ import {
   createGeofenceAlertRule,
   updateGeofenceAlertRule,
   deleteGeofenceAlertRule,
+  getAlertRulesByGeofenceId,
+  getAlertTypesForSelect,
   type GeofenceAlertRuleRow,
 } from '@/data/geofence-alert-rules';
 
@@ -62,6 +64,33 @@ const deleteGeofenceAlertRuleSchema = z.object({
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
+
+export async function getAlertRulesForGeofenceAction(
+  input: { geofenceId: string }
+): Promise<ActionResult<GeofenceAlertRuleRow[]>> {
+  const user = await resolveUser();
+  if (!user) return { success: false, error: 'User not found.' };
+
+  try {
+    const rules = await getAlertRulesByGeofenceId(user.id, BigInt(input.geofenceId));
+    return { success: true, data: rules };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unexpected error.';
+    return { success: false, error: message };
+  }
+}
+
+export async function getAlertTypesAction(): Promise<
+  ActionResult<{ id: number; name: string; category: string | null }[]>
+> {
+  try {
+    const types = await getAlertTypesForSelect();
+    return { success: true, data: types };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unexpected error.';
+    return { success: false, error: message };
+  }
+}
 
 export async function createGeofenceAlertRuleAction(
   input: z.infer<typeof createGeofenceAlertRuleSchema>

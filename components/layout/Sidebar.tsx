@@ -9,16 +9,13 @@ import {
   BellRing,
   Cpu,
   FolderOpen,
-  Gauge,
   History,
   Layers,
   Map,
   MapPin,
-  MapPinned,
   Package,
   Radio,
   Settings2,
-  ShieldAlert,
   Tag,
   User,
   Users,
@@ -67,7 +64,6 @@ const navGroups: NavGroup[] = [
     items: [
       { labelKey: 'nav.assets', href: '/assets', icon: Package },
       { labelKey: 'nav.assetTypes', href: '/asset-types', icon: FolderOpen },
-      { labelKey: 'nav.assetGeofenceAssignments', href: '/asset-geofence-assignments', icon: MapPinned },
     ],
   },
   {
@@ -76,8 +72,7 @@ const navGroups: NavGroup[] = [
     items: [
       { labelKey: 'nav.devices', href: '/devices', icon: Cpu },
       { labelKey: 'nav.deviceTypes', href: '/device-types', icon: Layers },
-      { labelKey: 'nav.deviceSensors', href: '/device-sensors', icon: Gauge },
-      { labelKey: 'nav.deviceLocationHistory', href: '/device-location-history', icon: History },
+{ labelKey: 'nav.deviceLocationHistory', href: '/device-location-history', icon: History },
     ],
   },
   {
@@ -86,7 +81,6 @@ const navGroups: NavGroup[] = [
     items: [
       { labelKey: 'nav.geofences', href: '/geofences', icon: MapPin },
       { labelKey: 'nav.geofenceTypes', href: '/geofence-types', icon: Map },
-      { labelKey: 'nav.geofenceAlertRules', href: '/geofence-alert-rules', icon: ShieldAlert },
     ],
   },
   {

@@ -2,18 +2,14 @@
 
 import { useCallback, useState } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
 import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
   Pencil,
   Trash2,
-  MapPin,
   Plus,
-  Link,
-  ShieldAlert,
+  Cpu,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,57 +31,38 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import type { PaginatedResult, GeofenceRow, GeofenceSortField } from '@/data/geofences';
-import { GeofenceFormDialog } from './GeofenceFormDialog';
-import { DeleteGeofenceDialog } from './DeleteGeofenceDialog';
-import { GeofenceMapDialog } from './GeofenceMapDialog';
-import { AssetAssignmentsDialog } from './AssetAssignmentsDialog';
-import { GeofenceAlertRulesDialog } from './GeofenceAlertRulesDialog';
+import type { PaginatedResult, AssetRow, AssetSortField } from '@/data/assets';
+import { AssetFormDialog } from './AssetFormDialog';
+import { DeleteAssetDialog } from './DeleteAssetDialog';
+import { DeviceAssignmentDialog } from './DeviceAssignmentDialog';
 
 interface Props {
-  initialData: PaginatedResult<GeofenceRow>;
-  geofenceTypes: { id: number; name: string }[];
-}
-
-function formatDate(date: Date | null | undefined): string {
-  if (!date) return '—';
-  return format(new Date(date), 'do MMM yyyy');
+  initialData: PaginatedResult<AssetRow>;
+  assetTypes: { id: number; name: string }[];
 }
 
 type SortDir = 'asc' | 'desc';
 
-export function GeofencesClient({ initialData, geofenceTypes }: Props) {
+export function AssetsClient({ initialData, assetTypes }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [formDialog, setFormDialog] = useState<{
     open: boolean;
-    geofence: GeofenceRow | null;
-  }>({ open: false, geofence: null });
+    asset: AssetRow | null;
+  }>({ open: false, asset: null });
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
-    geofence: GeofenceRow | null;
-  }>({ open: false, geofence: null });
+    asset: AssetRow | null;
+  }>({ open: false, asset: null });
 
-  const [mapDialog, setMapDialog] = useState<{
+  const [deviceDialog, setDeviceDialog] = useState<{
     open: boolean;
-    geofenceId: string | null;
-    geofenceName: string;
-  }>({ open: false, geofenceId: null, geofenceName: '' });
-
-  const [assignmentsDialog, setAssignmentsDialog] = useState<{
-    open: boolean;
-    geofenceId: string | null;
-    geofenceName: string;
-  }>({ open: false, geofenceId: null, geofenceName: '' });
-
-  const [alertRulesDialog, setAlertRulesDialog] = useState<{
-    open: boolean;
-    geofenceId: string | null;
-    geofenceName: string;
-  }>({ open: false, geofenceId: null, geofenceName: '' });
+    assetId: number | null;
+    assetNumber: string;
+  }>({ open: false, assetId: null, assetNumber: '' });
 
   // -------------------------------------------------------------------------
   // URL helpers
@@ -126,10 +103,10 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
   // Sorting
   // -------------------------------------------------------------------------
 
-  const currentSort = (searchParams.get('sort') as GeofenceSortField) ?? 'name';
+  const currentSort = (searchParams.get('sort') as AssetSortField) ?? 'number';
   const currentOrder = (searchParams.get('order') as SortDir) ?? 'asc';
 
-  function handleSort(field: GeofenceSortField) {
+  function handleSort(field: AssetSortField) {
     if (currentSort === field) {
       if (currentOrder === 'asc') {
         router.push(buildUrl({ sort: field, order: 'desc', page: '1' }));
@@ -141,7 +118,7 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
     }
   }
 
-  function SortIcon({ field }: { field: GeofenceSortField }) {
+  function SortIcon({ field }: { field: AssetSortField }) {
     if (currentSort !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />;
     if (currentOrder === 'asc') return <ArrowUp className="ml-1 h-3 w-3" />;
     return <ArrowDown className="ml-1 h-3 w-3" />;
@@ -151,7 +128,7 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
     field,
     children,
   }: {
-    field: GeofenceSortField;
+    field: AssetSortField;
     children: React.ReactNode;
   }) {
     return (
@@ -192,14 +169,14 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-4">
         <Input
-          placeholder="Search geofences..."
+          placeholder="Buscar activos..."
           value={searchValue}
           onChange={handleSearchChange}
           className="max-w-xs"
         />
-        <Button onClick={() => setFormDialog({ open: true, geofence: null })}>
+        <Button onClick={() => setFormDialog({ open: true, asset: null })}>
           <Plus className="h-4 w-4 mr-2" />
-          New Geofence
+          Nuevo Activo
         </Button>
       </div>
 
@@ -209,112 +186,62 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>
-                <SortableHeader field="name">Name</SortableHeader>
+                <SortableHeader field="number">Número</SortableHeader>
               </TableHead>
               <TableHead>
-                <SortableHeader field="typeName">Type</SortableHeader>
+                <SortableHeader field="assetTypeName">Tipo de Activo</SortableHeader>
               </TableHead>
               <TableHead>
-                <SortableHeader field="description">Description</SortableHeader>
+                <SortableHeader field="status">Estado</SortableHeader>
               </TableHead>
-              <TableHead>Geometry</TableHead>
-              <TableHead>
-                <SortableHeader field="active">Active</SortableHeader>
-              </TableHead>
-              <TableHead>
-                <SortableHeader field="createdAt">Created</SortableHeader>
-              </TableHead>
-              <TableHead>
-                <SortableHeader field="updatedAt">Updated</SortableHeader>
-              </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>Dispositivos</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                  No geofences found.
+                <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                  No se encontró información
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((geo) => (
-                <TableRow key={String(geo.id)}>
-                  <TableCell className="font-medium">{geo.name}</TableCell>
-                  <TableCell>{geo.typeName}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {geo.description
-                      ? geo.description.length > 40
-                        ? geo.description.slice(0, 40) + '…'
-                        : geo.description
-                      : '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{geo.geometrySummary || '—'}</TableCell>
+              data.map((asset) => (
+                <TableRow key={asset.id}>
+                  <TableCell className="font-medium">{asset.number}</TableCell>
+                  <TableCell>{asset.assetTypeName}</TableCell>
                   <TableCell>
-                    <Badge variant={geo.active ? 'default' : 'secondary'}>
-                      {geo.active ? 'Yes' : 'No'}
+                    <Badge variant={asset.status === 'active' ? 'default' : 'secondary'}>
+                      {asset.status === 'active' ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </TableCell>
-                  <TableCell>{formatDate(geo.createdAt)}</TableCell>
-                  <TableCell>{formatDate(geo.updatedAt)}</TableCell>
+                  <TableCell>{asset.deviceCount}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Activos Asignados"
-                        onClick={() =>
-                          setAssignmentsDialog({
-                            open: true,
-                            geofenceId: String(geo.id),
-                            geofenceName: geo.name,
-                          })
-                        }
-                      >
-                        <Link className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Reglas de Alerta"
-                        onClick={() =>
-                          setAlertRulesDialog({
-                            open: true,
-                            geofenceId: String(geo.id),
-                            geofenceName: geo.name,
-                          })
-                        }
-                      >
-                        <ShieldAlert className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Edit"
-                        onClick={() => setFormDialog({ open: true, geofence: geo })}
+                        title="Editar"
+                        onClick={() => setFormDialog({ open: true, asset })}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="View Map"
+                        title="Gestionar dispositivos"
                         onClick={() =>
-                          setMapDialog({
-                            open: true,
-                            geofenceId: String(geo.id),
-                            geofenceName: geo.name,
-                          })
+                          setDeviceDialog({ open: true, assetId: asset.id, assetNumber: asset.number })
                         }
                       >
-                        <MapPin className="h-4 w-4" />
+                        <Cpu className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Delete"
+                        title="Eliminar"
                         className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleteDialog({ open: true, geofence: geo })}
+                        onClick={() => setDeleteDialog({ open: true, asset })}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -385,46 +312,32 @@ export function GeofencesClient({ initialData, geofenceTypes }: Props) {
       )}
 
       {/* Dialogs */}
-      <GeofenceFormDialog
+      <AssetFormDialog
         open={formDialog.open}
-        geofence={formDialog.geofence}
-        geofenceTypes={geofenceTypes}
-        onClose={() => setFormDialog({ open: false, geofence: null })}
+        asset={formDialog.asset}
+        assetTypes={assetTypes}
+        onClose={() => setFormDialog({ open: false, asset: null })}
         onSuccess={() => {
-          setFormDialog({ open: false, geofence: null });
+          setFormDialog({ open: false, asset: null });
           handleMutationSuccess();
         }}
       />
 
-      <DeleteGeofenceDialog
+      <DeleteAssetDialog
         open={deleteDialog.open}
-        geofence={deleteDialog.geofence}
-        onClose={() => setDeleteDialog({ open: false, geofence: null })}
+        asset={deleteDialog.asset}
+        onClose={() => setDeleteDialog({ open: false, asset: null })}
         onSuccess={() => {
-          setDeleteDialog({ open: false, geofence: null });
+          setDeleteDialog({ open: false, asset: null });
           handleMutationSuccess();
         }}
       />
 
-      <GeofenceMapDialog
-        open={mapDialog.open}
-        geofenceId={mapDialog.geofenceId}
-        geofenceName={mapDialog.geofenceName}
-        onClose={() => setMapDialog({ open: false, geofenceId: null, geofenceName: '' })}
-      />
-
-      <AssetAssignmentsDialog
-        open={assignmentsDialog.open}
-        geofenceId={assignmentsDialog.geofenceId}
-        geofenceName={assignmentsDialog.geofenceName}
-        onClose={() => setAssignmentsDialog({ open: false, geofenceId: null, geofenceName: '' })}
-      />
-
-      <GeofenceAlertRulesDialog
-        open={alertRulesDialog.open}
-        geofenceId={alertRulesDialog.geofenceId}
-        geofenceName={alertRulesDialog.geofenceName}
-        onClose={() => setAlertRulesDialog({ open: false, geofenceId: null, geofenceName: '' })}
+      <DeviceAssignmentDialog
+        open={deviceDialog.open}
+        assetId={deviceDialog.assetId}
+        assetNumber={deviceDialog.assetNumber}
+        onClose={() => setDeviceDialog({ open: false, assetId: null, assetNumber: '' })}
       />
     </div>
   );

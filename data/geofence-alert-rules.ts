@@ -220,6 +220,50 @@ export async function getGeofenceAlertRuleById(
   };
 }
 
+export async function getAlertRulesByGeofenceId(
+  userId: bigint,
+  geofenceId: bigint,
+): Promise<GeofenceAlertRuleRow[]> {
+  const rows = await db
+    .select({
+      id: geofenceAlertRulesTable.id,
+      geofenceId: geofenceAlertRulesTable.geofenceId,
+      geofenceName: geofencesTable.name,
+      alertTypeId: geofenceAlertRulesTable.alertTypeId,
+      alertTypeName: alertTypesTable.name,
+      conditionType: geofenceAlertRulesTable.conditionType,
+      thresholdValue: geofenceAlertRulesTable.thresholdValue,
+      thresholdUnit: geofenceAlertRulesTable.thresholdUnit,
+      cooldownPeriod: geofenceAlertRulesTable.cooldownPeriod,
+      minimumDuration: geofenceAlertRulesTable.minimumDuration,
+      notificationChannels: geofenceAlertRulesTable.notificationChannels,
+      webhookUrl: geofenceAlertRulesTable.webhookUrl,
+      active: geofenceAlertRulesTable.active,
+      priority: geofenceAlertRulesTable.priority,
+      createdAt: geofenceAlertRulesTable.createdAt,
+      updatedAt: geofenceAlertRulesTable.updatedAt,
+    })
+    .from(geofenceAlertRulesTable)
+    .innerJoin(geofencesTable, eq(geofenceAlertRulesTable.geofenceId, geofencesTable.id))
+    .innerJoin(alertTypesTable, eq(geofenceAlertRulesTable.alertTypeId, alertTypesTable.id))
+    .where(
+      and(
+        eq(geofenceAlertRulesTable.geofenceId, geofenceId),
+        eq(geofencesTable.userId, userId),
+      )
+    )
+    .orderBy(asc(geofenceAlertRulesTable.priority), asc(geofenceAlertRulesTable.createdAt));
+
+  return rows.map((r) => ({
+    ...r,
+    alertTypeId: Number(r.alertTypeId),
+    priority: r.priority !== null ? Number(r.priority) : null,
+    notificationChannels: Array.isArray(r.notificationChannels)
+      ? (r.notificationChannels as string[])
+      : ['email'],
+  }));
+}
+
 export async function getAlertTypesForSelect(): Promise<
   { id: number; name: string; category: string | null }[]
 > {
