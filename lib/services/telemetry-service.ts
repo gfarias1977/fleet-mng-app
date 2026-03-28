@@ -16,18 +16,22 @@ export async function findDeviceBySerialNumber(
 
 export async function insertTelemetryEvent(
   deviceId: bigint,
+  sensorId: number,
   lat: number,
   lng: number,
   _alt: number,
-  timestamp: Date
+  timestamp: Date,
+  jsonData?: Record<string, unknown>
 ): Promise<{ id: bigint; eventTimestamp: Date }> {
   const [event] = await db
     .insert(telemetryEventsTable)
     .values({
       deviceId,
+      sensorId,
       eventTimestamp: timestamp,
       latitude:  lat.toString(),
       longitude: lng.toString(),
+      jsonData:  jsonData ?? null,
     })
     .returning();
 

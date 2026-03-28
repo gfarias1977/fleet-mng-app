@@ -101,7 +101,15 @@ async function main(): Promise<void> {
 
     try {
       const now   = new Date();
-      const event = await insertTelemetryEvent(device.id, latitude, longitude, altitude, now);
+      const event = await insertTelemetryEvent(
+        device.id,
+        sensor_id,
+        latitude,
+        longitude,
+        altitude,
+        now,
+        payload as unknown as Record<string, unknown>,
+      );
       console.log(
         `📍 [${device.name}] Event #${event.id} ` +
         `lat=${latitude} lng=${longitude} alt=${altitude} hdop=${payload.hdop}`

@@ -8,15 +8,18 @@ import {
   jsonb,
   // geometry, // Commented - not using PostGIS
   index,
-  primaryKey
+  primaryKey,
+  smallint
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { devicesTable } from './devices';
 import { alertsTable } from './alerts';
+import { sensorTable } from './sensors';
 
 export const telemetryEventsTable = pgTable('telemetry_events', {
   id: bigserial('tev_id', { mode: 'bigint' }).notNull(),
   deviceId: bigint('tev_device_id', { mode: 'bigint' }).references(() => devicesTable.id, { onDelete: 'cascade' }).notNull(),
+  sensorId: smallint('tev_sns_id').references(() => sensorTable.id).notNull(),
   eventTimestamp: timestamp('tev_event_timestamp', { withTimezone: true }).notNull(),
   
   // Location (using lat/lng instead of PostGIS geometry)

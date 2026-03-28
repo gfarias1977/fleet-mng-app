@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { db } from '../db';
-import { devicesTable, usersTable, assetGeofenceAssignmentsTable, geofenceAlertRulesTable } from '../db/schema';
+import { devicesTable, usersTable, assetGeofenceAssignmentsTable, geofenceAlertRulesTable, deviceSensorsTable } from '../db/schema';
 import { eq, isNotNull, count } from 'drizzle-orm';
 import { createMqttBus, subscribe, startSimulator, GpsPayload } from './mock-mqtt';
 import { insertTelemetryEvent } from '../../lib/services/telemetry-service';
@@ -14,11 +14,12 @@ import {
 } from '../../lib/services/alert-service';
 
 interface DeviceInfo {
-  id: bigint;
-  uuid: string;
-  name: string;
-  userId: bigint;
+  id:        bigint;
+  uuid:      string;
+  name:      string;
+  userId:    bigint;
   userEmail: string;
+  sensorId:  number;
 }
 
 // State maps (reset on worker restart)
@@ -195,7 +196,7 @@ async function handleGpsEvent(
   const timestamp = new Date(payload.timestamp);
 
   // Insert telemetry event
-  const event = await insertTelemetryEvent(device.id, payload.lat, payload.lng, payload.alt, timestamp);
+  const event = await insertTelemetryEvent(device.id, device.sensorId, payload.lat, payload.lng, payload.alt, timestamp);
   console.log(`📍 [${device.name}] Event #${event.id} at (${payload.lat.toFixed(5)}, ${payload.lng.toFixed(5)})`);
 
   // Evaluate geofences
@@ -289,9 +290,11 @@ async function main(): Promise<void> {
       name:      devicesTable.name,
       userId:    devicesTable.userId,
       userEmail: usersTable.email,
+      sensorId:  deviceSensorsTable.sensorId,
     })
     .from(devicesTable)
     .innerJoin(usersTable, eq(devicesTable.userId, usersTable.id))
+    .innerJoin(deviceSensorsTable, eq(deviceSensorsTable.deviceId, devicesTable.id))
     .where(eq(devicesTable.active, true));
 
   if (devices.length === 0) {
