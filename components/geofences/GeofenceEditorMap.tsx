@@ -1,11 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Circle, Polygon, Rectangle, Marker, useMapEvents, useMap } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Circle,
+  Polygon,
+  Rectangle,
+  Marker,
+  useMapEvents,
+  useMap,
+} from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 // Fix Leaflet default icon
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,7 +44,7 @@ interface Props {
 }
 
 // ---------------------------------------------------------------------------
-// CenterOnInitialGeometry (child inside MapContainer)
+// CenterOnInitialGeometry
 // ---------------------------------------------------------------------------
 
 function CenterOnInitialGeometry({ initialValue }: { initialValue: EditorGeometry | undefined }) {
@@ -42,7 +52,11 @@ function CenterOnInitialGeometry({ initialValue }: { initialValue: EditorGeometr
   const prevRef = useRef<EditorGeometry>(null);
 
   useEffect(() => {
-    if (!initialValue) return;
+    // Reset tracking when dialog is cleared between edits so next load always centers
+    if (!initialValue) {
+      prevRef.current = null;
+      return;
+    }
     if (JSON.stringify(prevRef.current) === JSON.stringify(initialValue)) return;
     prevRef.current = initialValue;
 
@@ -65,7 +79,7 @@ function CenterOnInitialGeometry({ initialValue }: { initialValue: EditorGeometr
 }
 
 // ---------------------------------------------------------------------------
-// FlyTo handler (child inside MapContainer)
+// FlyTo handler
 // ---------------------------------------------------------------------------
 
 function FlyToHandler({ flyTo }: { flyTo: { lat: number; lng: number; zoom: number } | null }) {
@@ -83,37 +97,41 @@ function FlyToHandler({ flyTo }: { flyTo: { lat: number; lng: number; zoom: numb
 }
 
 // ---------------------------------------------------------------------------
-// Map click + interactions
+// Map interaction
 // ---------------------------------------------------------------------------
 
 function MapInteraction({
   geometryType,
   value,
   onChange,
+  circularRadius,
 }: {
   geometryType: 'circular' | 'polygon' | 'rectangular';
   value: EditorGeometry;
   onChange: (v: EditorGeometry) => void;
+  circularRadius: number;
 }) {
   useMapEvents({
     click(e) {
       const { lat, lng } = e.latlng;
 
       if (geometryType === 'circular') {
-        const radius = value?.type === 'circular' ? value.radius : 500;
+        const radius = value?.type === 'circular' ? value.radius : circularRadius;
         onChange({ type: 'circular', lat, lng, radius });
+
       } else if (geometryType === 'polygon') {
         const existing = value?.type === 'polygon' ? value.points : [];
         onChange({ type: 'polygon', points: [...existing, { lat, lng }] });
+
       } else if (geometryType === 'rectangular') {
-        if (value?.type === 'rectangular' && !value.nwLat) {
-          // Set NW corner
+        // No value or wrong type → first click sets NW corner
+        if (!value || value.type !== 'rectangular') {
           onChange({ type: 'rectangular', nwLat: lat, nwLng: lng, seLat: 0, seLng: 0 });
-        } else if (value?.type === 'rectangular' && value.nwLat && (!value.seLat || value.seLat === 0)) {
-          // Set SE corner
-          onChange({ type: 'rectangular', nwLat: value.nwLat, nwLng: value.nwLng, seLat: lat, seLng: lng });
+        } else if (value.seLat === 0) {
+          // Second click → sets SE corner
+          onChange({ ...value, seLat: lat, seLng: lng });
         } else {
-          // Reset with new NW corner
+          // Third click → starts over with new NW corner
           onChange({ type: 'rectangular', nwLat: lat, nwLng: lng, seLat: 0, seLng: 0 });
         }
       }
@@ -132,6 +150,16 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
   const [addressLoading, setAddressLoading] = useState(false);
   const [tileLayer, setTileLayer] = useState<'default' | 'satellite'>('default');
 
+  // Independent radius state — persists before center is clicked and across re-renders
+  const [circularRadius, setCircularRadius] = useState(500);
+
+  // Sync radius when geometry is loaded externally (edit mode)
+  useEffect(() => {
+    if (value?.type === 'circular') {
+      setCircularRadius(value.radius);
+    }
+  }, [value]);
+
   async function handleAddressSearch() {
     const q = addressInput.trim();
     if (!q) return;
@@ -139,10 +167,10 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
-        { headers: { 'Accept-Language': 'en' } }
+        { headers: { 'Accept-Language': 'es' } }
       );
       const data = await res.json();
-      if (data && data.length > 0) {
+      if (data?.length > 0) {
         const { lat, lon } = data[0];
         setFlyTo({ lat: parseFloat(lat), lng: parseFloat(lon), zoom: 14 });
       }
@@ -151,10 +179,12 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
     }
   }
 
-  // Radius input for circular
   function handleRadiusChange(e: React.ChangeEvent<HTMLInputElement>) {
     const r = parseFloat(e.target.value);
-    if (value?.type === 'circular' && !isNaN(r) && r > 0) {
+    if (isNaN(r) || r <= 0) return;
+    setCircularRadius(r);
+    // Also update the live geometry if a center is already set
+    if (value?.type === 'circular') {
       onChange({ ...value, radius: r });
     }
   }
@@ -169,22 +199,32 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
     onChange(null);
   }
 
-  // Build polygon positions for Leaflet
+  // Derived display values
   const polygonPositions =
-    value?.type === 'polygon' ? value.points.map((p) => [p.lat, p.lng] as [number, number]) : [];
+    value?.type === 'polygon'
+      ? value.points.map((p) => [p.lat, p.lng] as [number, number])
+      : [];
 
-  // Build rectangle bounds (only when both corners are set)
   const rectBounds =
     value?.type === 'rectangular' && value.seLat !== 0
       ? ([[value.nwLat, value.nwLng], [value.seLat, value.seLng]] as [[number, number], [number, number]])
       : null;
+
+  const rectState =
+    !value || value.type !== 'rectangular'
+      ? 'none'
+      : value.seLat === 0
+      ? 'nw-set'
+      : 'complete';
+
+  const polygonCount = value?.type === 'polygon' ? value.points.length : 0;
 
   return (
     <div className="flex flex-col gap-2 h-full">
       {/* Address search */}
       <div className="flex gap-2">
         <Input
-          placeholder="Search address..."
+          placeholder="Buscar dirección o ciudad..."
           value={addressInput}
           onChange={(e) => setAddressInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAddressSearch()}
@@ -197,58 +237,75 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
           onClick={handleAddressSearch}
           disabled={addressLoading}
         >
-          {addressLoading ? '…' : 'Go'}
+          {addressLoading ? '…' : 'Ir'}
         </Button>
       </div>
 
       {/* Geometry controls */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {geometryType === 'circular' && value?.type === 'circular' && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Radius (m):</span>
-            <Input
-              type="number"
-              min={1}
-              value={value.radius}
-              onChange={handleRadiusChange}
-              className="w-24 text-sm h-7"
-            />
-          </div>
+      <div className="flex flex-wrap gap-3 items-center min-h-[32px]">
+
+        {/* CIRCULAR — radius input always visible */}
+        {geometryType === 'circular' && (
+          <>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground whitespace-nowrap">Radio (m):</Label>
+              <Input
+                type="number"
+                min={1}
+                step={50}
+                value={circularRadius}
+                onChange={handleRadiusChange}
+                className="w-28 text-sm h-7"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {value?.type === 'circular'
+                ? `Centro: ${value.lat.toFixed(5)}, ${value.lng.toFixed(5)}`
+                : 'Haz clic en el mapa para fijar el centro'}
+            </span>
+          </>
         )}
+
+        {/* POLYGON — undo + point counter */}
         {geometryType === 'polygon' && (
-          <Button type="button" variant="outline" size="sm" onClick={handleUndoPoint}
-            disabled={!value || value.type !== 'polygon' || value.points.length === 0}>
-            Undo point
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleUndoPoint}
+              disabled={polygonCount === 0}
+            >
+              Deshacer punto
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {polygonCount === 0
+                ? 'Haz clic en el mapa para agregar vértices'
+                : `${polygonCount} vértice${polygonCount !== 1 ? 's' : ''}${polygonCount < 3 ? ` — faltan ${3 - polygonCount} para cerrar` : ' ✓'}`}
+            </span>
+          </>
         )}
-        <Button type="button" variant="outline" size="sm" onClick={handleReset}>
-          Reset
+
+        {/* RECTANGULAR — step hints */}
+        {geometryType === 'rectangular' && (
+          <span className="text-xs text-muted-foreground">
+            {rectState === 'none' && 'Haz clic para fijar la esquina NW (noroeste)'}
+            {rectState === 'nw-set' && 'Ahora haz clic para fijar la esquina SE (sureste)'}
+            {rectState === 'complete' && 'Rectángulo completo · haz clic para reiniciar'}
+          </span>
+        )}
+
+        <Button type="button" variant="outline" size="sm" onClick={handleReset} className="ml-auto">
+          Limpiar
         </Button>
-        {geometryType === 'rectangular' && value?.type === 'rectangular' && (
-          <span className="text-xs text-muted-foreground">
-            {value.seLat === 0 ? 'Click SE corner' : 'Click to reset'}
-          </span>
-        )}
-        {geometryType === 'circular' && !value && (
-          <span className="text-xs text-muted-foreground">Click map to set center</span>
-        )}
-        {geometryType === 'polygon' && (
-          <span className="text-xs text-muted-foreground">
-            {value?.type === 'polygon' ? `${value.points.length} pts` : 'Click map to add points'}
-          </span>
-        )}
-        {geometryType === 'rectangular' && !value && (
-          <span className="text-xs text-muted-foreground">Click NW corner</span>
-        )}
       </div>
 
       {/* Map */}
-      <div className="relative flex-1 min-h-0 rounded-md overflow-hidden border" style={{ minHeight: '350px' }}>
-        <MapContainer
-          center={[20, 0]}
-          zoom={2}
-          style={{ height: '100%', width: '100%' }}
-        >
+      <div
+        className="relative flex-1 min-h-0 rounded-md overflow-hidden border"
+        style={{ minHeight: '350px' }}
+      >
+        <MapContainer center={[20, 0]} zoom={2} style={{ height: '100%', width: '100%' }}>
           {tileLayer === 'default' ? (
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -256,19 +313,18 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
             />
           ) : (
             <TileLayer
-              attribution='Tiles &copy; Esri'
+              attribution="Tiles &copy; Esri"
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             />
           )}
 
           <CenterOnInitialGeometry initialValue={initialValue} />
-
           <FlyToHandler flyTo={flyTo} />
-
           <MapInteraction
             geometryType={geometryType}
             value={value}
             onChange={onChange}
+            circularRadius={circularRadius}
           />
 
           {/* Circular */}
@@ -283,7 +339,7 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
             </>
           )}
 
-          {/* Polygon */}
+          {/* Polygon — markers draggables + polygon when ≥ 3 pts */}
           {value?.type === 'polygon' && polygonPositions.length >= 3 && (
             <Polygon
               positions={polygonPositions}
@@ -316,20 +372,20 @@ export default function GeofenceEditorMap({ geometryType, value, onChange, initi
               pathOptions={{ color: 'hsl(38, 92%, 50%)', fillOpacity: 0.2 }}
             />
           )}
-          {value?.type === 'rectangular' && value.nwLat !== 0 && (
-            <Marker position={[value.nwLat, value.nwLng]} />
-          )}
-          {value?.type === 'rectangular' && value.seLat !== 0 && (
-            <Marker position={[value.seLat, value.seLng]} />
+          {value?.type === 'rectangular' && (
+            <>
+              {value.nwLat !== 0 && <Marker position={[value.nwLat, value.nwLng]} />}
+              {value.seLat !== 0 && <Marker position={[value.seLat, value.seLng]} />}
+            </>
           )}
         </MapContainer>
+
         <button
           type="button"
-          onClick={() => setTileLayer(t => t === 'default' ? 'satellite' : 'default')}
+          onClick={() => setTileLayer((t) => (t === 'default' ? 'satellite' : 'default'))}
           className="absolute top-2 right-2 z-[1001] bg-white rounded shadow px-2 py-1 text-xs font-medium border border-gray-200 hover:bg-gray-50 cursor-pointer"
-          title="Toggle map layer"
         >
-          {tileLayer === 'default' ? 'Satellite' : 'Default'}
+          {tileLayer === 'default' ? 'Satélite' : 'Mapa'}
         </button>
       </div>
     </div>

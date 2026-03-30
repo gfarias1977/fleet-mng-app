@@ -177,11 +177,12 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Asset</TableHead>
-                        <TableHead>Device</TableHead>
+                        <TableHead>Activo</TableHead>
+                        <TableHead>Dispositivo</TableHead>
                         <TableHead>Serial</TableHead>
-                        <TableHead>Sensors</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead>Sensores</TableHead>
+                        <TableHead>Posición</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -193,12 +194,17 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
                           <TableCell className="text-xs text-muted-foreground">
                             {asset.sensors.map((s) => s.name).join(', ') || '—'}
                           </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {asset.lastLat !== null
+                              ? `${parseFloat(asset.lastLat).toFixed(5)}, ${parseFloat(asset.lastLng!).toFixed(5)}`
+                              : <span className="italic">Sin posición</span>}
+                          </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                title="View Alerts"
+                                title="Ver alertas"
                                 onClick={() => setAlertsSheet({ assetId: asset.id, assetName: asset.number })}
                               >
                                 <Bell className="h-4 w-4" />
@@ -206,7 +212,7 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                title="View Notifications"
+                                title="Ver notificaciones"
                                 onClick={() => setNotifSheet({ assetId: asset.id, assetName: asset.number })}
                               >
                                 <BellDot className="h-4 w-4" />
@@ -214,8 +220,13 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                title="Center on asset"
-                                onClick={() => setFlyToAsset({ lat: parseFloat(asset.lastLat), lng: parseFloat(asset.lastLng) })}
+                                title="Centrar en activo"
+                                disabled={asset.lastLat === null}
+                                onClick={() => {
+                                  if (asset.lastLat && asset.lastLng) {
+                                    setFlyToAsset({ lat: parseFloat(asset.lastLat), lng: parseFloat(asset.lastLng) });
+                                  }
+                                }}
                               >
                                 <LocateFixed className="h-4 w-4" />
                               </Button>

@@ -226,16 +226,16 @@ async function seedDevices(ctx: SeedContext): Promise<SeedContext> {
 async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
   const user = await resolveUser(ctx);
 
-  console.log('\n🗺️  Creando geofence type...');
-  await db.insert(geofenceTypesTable).values({
-    name: 'Polygon Area',
-    description: 'General polygon geofence',
-    isActive: true,
-  }).onConflictDoNothing();
+  console.log('\n🗺️  Creando geofence types...');
+  await db.insert(geofenceTypesTable).values([
+    { name: 'Circular',     description: 'Circular geofence defined by center point and radius', isActive: true },
+    { name: 'Polygon',      description: 'Polygon geofence defined by a set of vertices',        isActive: true },
+    { name: 'Rectangular',  description: 'Rectangular geofence defined by NW and SE corners',    isActive: true },
+  ]).onConflictDoNothing();
   const [geofenceType] = await db
     .select({ id: geofenceTypesTable.id })
     .from(geofenceTypesTable)
-    .where(eq(geofenceTypesTable.name, 'Polygon Area'))
+    .where(eq(geofenceTypesTable.name, 'Circular'))
     .limit(1);
 
   console.log('📍 Creando geocerca...');
@@ -297,16 +297,27 @@ async function seedGeofences(ctx: SeedContext): Promise<SeedContext> {
 async function seedTrackingEvents(ctx: SeedContext): Promise<SeedContext> {
   const { device1, device2 } = await resolveDevices(ctx);
 
+  // Fetch the primary GPS sensor for each device
+  const sensorRows = await db
+    .select({ deviceId: deviceSensorsTable.deviceId, sensorId: deviceSensorsTable.sensorId })
+    .from(deviceSensorsTable)
+    .where(inArray(deviceSensorsTable.deviceId, [device1.id, device2.id]));
+
+  const sensorByDevice = new Map(sensorRows.map((r) => [String(r.deviceId), r.sensorId]));
+  const sns1 = sensorByDevice.get(String(device1.id));
+  const sns2 = sensorByDevice.get(String(device2.id));
+  if (!sns1 || !sns2) throw new Error('Sensors not found for devices. Run section "Sensores y dispositivos" first.');
+
   console.log('\n📊 Creando tracking events...');
   const device1Events = [
-    { deviceId: device1.id, eventTimestamp: new Date(Date.now() - 15 * 60 * 1000), latitude: '-33.41450000', longitude: '-70.58000000' },
-    { deviceId: device1.id, eventTimestamp: new Date(Date.now() - 5 * 60 * 1000),  latitude: '-33.41500000', longitude: '-70.57850000' },
-    { deviceId: device1.id, eventTimestamp: new Date(),                             latitude: '-33.41550000', longitude: '-70.57700000' },
+    { deviceId: device1.id, sensorId: sns1, eventTimestamp: new Date(Date.now() - 15 * 60 * 1000), latitude: '-33.41450000', longitude: '-70.58000000' },
+    { deviceId: device1.id, sensorId: sns1, eventTimestamp: new Date(Date.now() - 5 * 60 * 1000),  latitude: '-33.41500000', longitude: '-70.57850000' },
+    { deviceId: device1.id, sensorId: sns1, eventTimestamp: new Date(),                             latitude: '-33.41550000', longitude: '-70.57700000' },
   ];
   const device2Events = [
-    { deviceId: device2.id, eventTimestamp: new Date(Date.now() - 20 * 60 * 1000), latitude: '-33.41200000', longitude: '-70.58200000' },
-    { deviceId: device2.id, eventTimestamp: new Date(Date.now() - 10 * 60 * 1000), latitude: '-33.41300000', longitude: '-70.57950000' },
-    { deviceId: device2.id, eventTimestamp: new Date(),                             latitude: '-33.41400000', longitude: '-70.57800000' },
+    { deviceId: device2.id, sensorId: sns2, eventTimestamp: new Date(Date.now() - 20 * 60 * 1000), latitude: '-33.41200000', longitude: '-70.58200000' },
+    { deviceId: device2.id, sensorId: sns2, eventTimestamp: new Date(Date.now() - 10 * 60 * 1000), latitude: '-33.41300000', longitude: '-70.57950000' },
+    { deviceId: device2.id, sensorId: sns2, eventTimestamp: new Date(),                             latitude: '-33.41400000', longitude: '-70.57800000' },
   ];
 
   await db.insert(telemetryEventsTable).values([...device1Events, ...device2Events]);

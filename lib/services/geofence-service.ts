@@ -152,7 +152,7 @@ export async function evaluateGeofencePositions(
       distanceMeters = haversineDistanceMeters(lat, lng, centerLat, centerLng);
       isInside = distanceMeters <= radiusMeters;
 
-    } else if (typeName === 'polygon') {
+    } else if (typeName === 'polygon' || typeName === 'poligonal') {
       const rows = await db
         .select({
           lat: geofencePolygonPointsTable.latitude,

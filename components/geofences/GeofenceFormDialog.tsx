@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,11 +32,15 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { createGeofenceAction, updateGeofenceAction, getGeofenceWithGeometryAction } from '@/app/(main)/geofences/actions';
+import {
+  createGeofenceAction,
+  updateGeofenceAction,
+  getGeofenceWithGeometryAction,
+} from '@/app/(main)/geofences/actions';
 import type { GeofenceRow, GeofenceGeometry } from '@/data/geofences';
 import type { EditorGeometry } from './GeofenceEditorMap';
 
-// Dynamically import the map – no SSR
+// Dynamically import the map — no SSR
 const GeofenceEditorMap = dynamic(() => import('./GeofenceEditorMap'), {
   ssr: false,
   loading: () => <Skeleton className="h-full w-full min-h-[350px]" />,
@@ -47,9 +51,9 @@ const GeofenceEditorMap = dynamic(() => import('./GeofenceEditorMap'), {
 // ---------------------------------------------------------------------------
 
 const schema = z.object({
-  name: z.string().min(1, 'Name is required').max(100),
+  name: z.string().min(1, 'Nombre requerido').max(100),
   description: z.string().max(500).optional(),
-  geofenceTypeId: z.string().min(1, 'Type is required'),
+  geofenceTypeId: z.string().min(1, 'Tipo requerido'),
   active: z.enum(['true', 'false']),
 });
 
@@ -90,10 +94,7 @@ function geometryToEditor(geometry: GeofenceGeometry): EditorGeometry {
   return null;
 }
 
-function editorToGeometry(
-  editor: EditorGeometry,
-  typeId: number
-): GeofenceGeometry {
+function editorToGeometry(editor: EditorGeometry): GeofenceGeometry {
   if (!editor) return null;
   if (editor.type === 'circular') {
     return {
@@ -122,7 +123,6 @@ function editorToGeometry(
       seLongitude: String(editor.seLng),
     };
   }
-  void typeId;
   return null;
 }
 
@@ -131,9 +131,17 @@ function getGeometryType(
   geofenceTypes: { id: number; name: string }[]
 ): 'circular' | 'polygon' | 'rectangular' {
   const name = geofenceTypes.find((t) => t.id === Number(typeId))?.name?.toLowerCase() ?? '';
-  if (name === 'polygon') return 'polygon';
+  if (name === 'polygon' || name === 'poligonal') return 'polygon';
   if (name === 'rectangular') return 'rectangular';
   return 'circular';
+}
+
+function isGeometryComplete(editor: EditorGeometry): boolean {
+  if (!editor) return false;
+  if (editor.type === 'circular') return editor.lat !== 0 || editor.lng !== 0;
+  if (editor.type === 'polygon') return editor.points.length >= 3;
+  if (editor.type === 'rectangular') return editor.seLat !== 0;
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,32 +168,40 @@ export function GeofenceFormDialog({
   onSuccess,
 }: Props) {
   const isEdit = geofence !== null;
+  const defaultTypeId = String(geofenceTypes[0]?.id ?? '');
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: '',
       description: '',
-      geofenceTypeId: '1',
+      geofenceTypeId: defaultTypeId,
       active: 'true',
     },
   });
 
   const [editorGeometry, setEditorGeometry] = useState<EditorGeometry>(null);
   const [initialGeometry, setInitialGeometry] = useState<EditorGeometry>(null);
+
   const selectedTypeId = form.watch('geofenceTypeId');
   const mapGeometryType = getGeometryType(selectedTypeId, geofenceTypes);
 
-  // Reset geometry when type changes
+  // Prevents the type-change effect from wiping geometry during initial edit load.
+  // Set to true before form.reset(), cleared after the async geometry fetch completes.
+  const isInitialLoadRef = useRef(false);
+
+  // Reset geometry when user manually changes type (skip during initial edit load)
   useEffect(() => {
+    if (isInitialLoadRef.current) return;
     setEditorGeometry(null);
   }, [selectedTypeId]);
 
-  // Pre-fill when editing
+  // Pre-fill when editing / reset when creating
   useEffect(() => {
     if (!open) return;
 
     if (geofence) {
+      isInitialLoadRef.current = true;
       form.reset({
         name: geofence.name,
         description: geofence.description ?? '',
@@ -195,8 +211,8 @@ export function GeofenceFormDialog({
       setEditorGeometry(null);
       setInitialGeometry(null);
 
-      // Fetch geometry for edit mode
       getGeofenceWithGeometryAction({ id: String(geofence.id) }).then((result) => {
+        isInitialLoadRef.current = false;
         if (result.success && result.data?.geometry) {
           const geo = geometryToEditor(result.data.geometry);
           setEditorGeometry(geo);
@@ -207,63 +223,65 @@ export function GeofenceFormDialog({
       form.reset({
         name: '',
         description: '',
-        geofenceTypeId: '1',
+        geofenceTypeId: defaultTypeId,
         active: 'true',
       });
       setEditorGeometry(null);
       setInitialGeometry(null);
     }
-  }, [geofence, open, form]);
+  }, [geofence, open, form, defaultTypeId]);
 
   async function onSubmit(values: FormValues) {
-    const typeId = Number(values.geofenceTypeId);
-    const geometry = editorToGeometry(editorGeometry, typeId);
+    const geometry = editorToGeometry(editorGeometry);
 
     if (!geometry) {
-      toast.error('Please draw a geofence on the map.');
+      toast.error('Dibuja la geocerca en el mapa antes de guardar.');
+      return;
+    }
+
+    if (!isGeometryComplete(editorGeometry)) {
+      if (editorGeometry?.type === 'polygon') {
+        toast.error('El polígono requiere al menos 3 vértices.');
+      } else if (editorGeometry?.type === 'rectangular') {
+        toast.error('Selecciona las dos esquinas del rectángulo.');
+      }
       return;
     }
 
     const payload = {
       name: values.name,
       description: values.description || null,
-      geofenceTypeId: typeId,
+      geofenceTypeId: Number(values.geofenceTypeId),
       active: values.active === 'true',
       geometry,
     };
 
     if (isEdit) {
-      const result = await updateGeofenceAction({
-        id: String(geofence!.id),
-        ...payload,
-      });
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success('Geofence updated successfully.');
+      const result = await updateGeofenceAction({ id: String(geofence!.id), ...payload });
+      if (!result.success) { toast.error(result.error); return; }
+      toast.success('Geocerca actualizada.');
     } else {
       const result = await createGeofenceAction(payload);
-      if (!result.success) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success('Geofence created successfully.');
+      if (!result.success) { toast.error(result.error); return; }
+      toast.success('Geocerca creada.');
     }
 
     onSuccess();
   }
 
+  const geometryComplete = isGeometryComplete(editorGeometry);
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Geofence' : 'New Geofence'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Editar Geocerca' : 'Nueva Geocerca'}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
               {/* Left column: fields */}
               <div className="space-y-4">
                 {/* Name */}
@@ -272,9 +290,9 @@ export function GeofenceFormDialog({
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Name</FormLabel>
+                      <FormLabel>Nombre</FormLabel>
                       <FormControl>
-                        <Input placeholder="My Geofence" {...field} />
+                        <Input placeholder="Mi Geocerca" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -287,9 +305,9 @@ export function GeofenceFormDialog({
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>Descripción</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Optional description..." rows={2} {...field} />
+                        <Textarea placeholder="Descripción opcional..." rows={2} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -302,11 +320,11 @@ export function GeofenceFormDialog({
                   name="geofenceTypeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type</FormLabel>
+                      <FormLabel>Tipo</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select type..." />
+                            <SelectValue placeholder="Seleccionar tipo..." />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -328,7 +346,7 @@ export function GeofenceFormDialog({
                   name="active"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Active</FormLabel>
+                      <FormLabel>Activa</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
@@ -336,7 +354,7 @@ export function GeofenceFormDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="true">Yes</SelectItem>
+                          <SelectItem value="true">Sí</SelectItem>
                           <SelectItem value="false">No</SelectItem>
                         </SelectContent>
                       </Select>
@@ -347,15 +365,24 @@ export function GeofenceFormDialog({
 
                 {/* Geometry summary */}
                 {editorGeometry && (
-                  <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground space-y-1">
                     {editorGeometry.type === 'circular' && (
-                      <>Center: {editorGeometry.lat.toFixed(5)}, {editorGeometry.lng.toFixed(5)} · Radius: {editorGeometry.radius}m</>
+                      <>
+                        <p>Centro: {editorGeometry.lat.toFixed(6)}, {editorGeometry.lng.toFixed(6)}</p>
+                        <p>Radio: {editorGeometry.radius} m</p>
+                      </>
                     )}
                     {editorGeometry.type === 'polygon' && (
-                      <>{editorGeometry.points.length} vertices</>
+                      <p>{editorGeometry.points.length} vértices{geometryComplete ? ' ✓' : ` — faltan ${3 - editorGeometry.points.length}`}</p>
                     )}
                     {editorGeometry.type === 'rectangular' && editorGeometry.seLat !== 0 && (
-                      <>NW: {editorGeometry.nwLat.toFixed(5)}, {editorGeometry.nwLng.toFixed(5)} · SE: {editorGeometry.seLat.toFixed(5)}, {editorGeometry.seLng.toFixed(5)}</>
+                      <>
+                        <p>NW: {editorGeometry.nwLat.toFixed(6)}, {editorGeometry.nwLng.toFixed(6)}</p>
+                        <p>SE: {editorGeometry.seLat.toFixed(6)}, {editorGeometry.seLng.toFixed(6)}</p>
+                      </>
+                    )}
+                    {editorGeometry.type === 'rectangular' && editorGeometry.seLat === 0 && (
+                      <p>NW fijado — selecciona la esquina SE en el mapa</p>
                     )}
                   </div>
                 )}
@@ -374,10 +401,10 @@ export function GeofenceFormDialog({
 
             <DialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
+                Cancelar
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Saving…' : 'Save'}
+                {form.formState.isSubmitting ? 'Guardando…' : 'Guardar'}
               </Button>
             </DialogFooter>
           </form>

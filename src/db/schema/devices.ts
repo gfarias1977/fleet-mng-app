@@ -21,7 +21,7 @@ import { deviceLocationHistoryTable } from './device-location-history';
 
 export const devicesTable = pgTable('devices', {
   id: bigserial('dev_id', { mode: 'bigint' }).primaryKey(),
-  serialNumber: varchar('serial_number', { length: 100 }).unique().notNull(),
+  serialNumber: varchar('dev_serial_number', { length: 100 }).unique().notNull(),
   userId: bigint('dev_user_id', { mode: 'bigint' }).references(() => usersTable.id, { onDelete: 'cascade' }).notNull(),
   deviceTypeId: smallint('dev_dvt_id').references(() => deviceTypesTable.id).notNull(),
   assetId: bigint('dev_ass_id', { mode: 'bigint' }).references(() => assetTable.id, { onDelete: 'set null' }),

@@ -140,26 +140,28 @@ export default function GeofenceMap({ data, flyToAsset }: Props) {
         />
       )}
 
-      {/* Asset markers */}
-      {assets.map((asset) => (
-        <Marker
-          key={asset.id}
-          position={[parseFloat(asset.lastLat), parseFloat(asset.lastLng)]}
-          eventHandlers={{
-            mouseover: (e) => e.target.openPopup(),
-            mouseout: (e) => e.target.closePopup(),
-          }}
-        >
-          <Popup>
-            <div className="text-sm space-y-0.5">
-              <p className="font-semibold">{asset.number}</p>
-              <p className="text-xs text-muted-foreground">SN: {asset.deviceSerialNumber}</p>
-              <p className="text-xs text-muted-foreground">Lat: {parseFloat(asset.lastLat).toFixed(6)}</p>
-              <p className="text-xs text-muted-foreground">Lng: {parseFloat(asset.lastLng).toFixed(6)}</p>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+      {/* Asset markers — only for assets with known position */}
+      {assets
+        .filter((a) => a.lastLat !== null && a.lastLng !== null)
+        .map((asset) => (
+          <Marker
+            key={asset.id}
+            position={[parseFloat(asset.lastLat!), parseFloat(asset.lastLng!)]}
+            eventHandlers={{
+              mouseover: (e) => e.target.openPopup(),
+              mouseout: (e) => e.target.closePopup(),
+            }}
+          >
+            <Popup>
+              <div className="text-sm space-y-0.5">
+                <p className="font-semibold">{asset.number}</p>
+                <p className="text-xs text-muted-foreground">SN: {asset.deviceSerialNumber}</p>
+                <p className="text-xs text-muted-foreground">Lat: {parseFloat(asset.lastLat!).toFixed(6)}</p>
+                <p className="text-xs text-muted-foreground">Lng: {parseFloat(asset.lastLng!).toFixed(6)}</p>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
     </MapContainer>
     <button
       type="button"

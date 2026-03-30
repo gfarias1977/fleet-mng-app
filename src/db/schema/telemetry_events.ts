@@ -18,7 +18,7 @@ import { sensorTable } from './sensors';
 
 export const telemetryEventsTable = pgTable('telemetry_events', {
   id: bigserial('tev_id', { mode: 'bigint' }).notNull(),
-  deviceId: bigint('tev_device_id', { mode: 'bigint' }).references(() => devicesTable.id, { onDelete: 'cascade' }).notNull(),
+  deviceId: bigint('tev_dev_id', { mode: 'bigint' }).references(() => devicesTable.id, { onDelete: 'cascade' }).notNull(),
   sensorId: smallint('tev_sns_id').references(() => sensorTable.id).notNull(),
   eventTimestamp: timestamp('tev_event_timestamp', { withTimezone: true }).notNull(),
   

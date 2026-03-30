@@ -84,9 +84,9 @@ export type GeofenceMapData = {
   assets: Array<{
     id: number;
     number: string;
-    lastLat: string;
-    lastLng: string;
-    lastTimestamp: Date;
+    lastLat: string | null;
+    lastLng: string | null;
+    lastTimestamp: Date | null;
     deviceId: bigint;
     deviceName: string;
     deviceSerialNumber: string;
@@ -97,6 +97,26 @@ export type GeofenceMapData = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+// Normalize Spanish/English type names to a canonical kind
+function geofenceKind(typeName: string): 'circular' | 'polygon' | 'rectangular' | null {
+  const t = typeName.toLowerCase();
+  if (t === 'circular') return 'circular';
+  if (t === 'polygon' || t === 'poligonal') return 'polygon';
+  if (t === 'rectangular') return 'rectangular';
+  return null;
+}
+
+function buildGeometrySummary(
+  typeName: string,
+  radiusMeters: string | null
+): string {
+  const kind = geofenceKind(typeName);
+  if (kind === 'circular') return radiusMeters ? `r=${Math.round(parseFloat(radiusMeters))}m` : '';
+  if (kind === 'rectangular') return 'NW/SE';
+  if (kind === 'polygon') return 'Poligonal';
+  return '';
+}
 
 function getSortColumn(field: GeofenceSortField) {
   switch (field) {
@@ -166,15 +186,6 @@ export async function getGeofencesPaginated(
       active: geofencesTable.active,
       createdAt: geofencesTable.createdAt,
       updatedAt: geofencesTable.updatedAt,
-      geometrySummary: sql<string>`(CASE
-        WHEN lower(${geofenceTypesTable.name}) = 'circular'
-          THEN 'r=' || ROUND(COALESCE(${geofencesTable.radiusMeters}::numeric, 0)) || 'm'
-        WHEN lower(${geofenceTypesTable.name}) = 'polygon'
-          THEN (SELECT COUNT(*)::text || ' pts' FROM geofence_polygon_points WHERE gpp_geo_id = ${geofencesTable.id})
-        WHEN lower(${geofenceTypesTable.name}) = 'rectangular'
-          THEN 'NW/SE'
-        ELSE ''
-      END)`,
     })
     .from(geofencesTable)
     .leftJoin(geofenceTypesTable, eq(geofencesTable.geofenceTypeId, geofenceTypesTable.id))
@@ -183,8 +194,13 @@ export async function getGeofencesPaginated(
     .limit(pageSize)
     .offset(offset);
 
+  const data: GeofenceRow[] = rows.map((r) => ({
+    ...r,
+    geometrySummary: buildGeometrySummary(r.typeName, r.radiusMeters),
+  }));
+
   return {
-    data: rows as GeofenceRow[],
+    data,
     total,
     page,
     pageSize,
@@ -210,22 +226,14 @@ export async function getGeofenceById(
       active: geofencesTable.active,
       createdAt: geofencesTable.createdAt,
       updatedAt: geofencesTable.updatedAt,
-      geometrySummary: sql<string>`(CASE
-        WHEN lower(${geofenceTypesTable.name}) = 'circular'
-          THEN 'r=' || ROUND(COALESCE(${geofencesTable.radiusMeters}::numeric, 0)) || 'm'
-        WHEN lower(${geofenceTypesTable.name}) = 'polygon'
-          THEN (SELECT COUNT(*)::text || ' pts' FROM geofence_polygon_points WHERE gpp_geo_id = ${geofencesTable.id})
-        WHEN lower(${geofenceTypesTable.name}) = 'rectangular'
-          THEN 'NW/SE'
-        ELSE ''
-      END)`,
     })
     .from(geofencesTable)
     .leftJoin(geofenceTypesTable, eq(geofencesTable.geofenceTypeId, geofenceTypesTable.id))
     .where(and(eq(geofencesTable.id, id), eq(geofencesTable.userId, userId)))
     .limit(1);
 
-  return (row as GeofenceRow) ?? null;
+  if (!row) return null;
+  return { ...row, geometrySummary: buildGeometrySummary(row.typeName, row.radiusMeters) } as GeofenceRow;
 }
 
 export async function getGeofenceWithGeometry(
@@ -236,9 +244,9 @@ export async function getGeofenceWithGeometry(
   if (!row) return null;
 
   let geometry: GeofenceGeometry = null;
-  const typeName = row.typeName.toLowerCase();
+  const kind = geofenceKind(row.typeName);
 
-  if (typeName === 'circular') {
+  if (kind === 'circular') {
     if (row.centerLatitude && row.centerLongitude && row.radiusMeters) {
       geometry = {
         type: 'circular',
@@ -247,7 +255,7 @@ export async function getGeofenceWithGeometry(
         radiusMeters: row.radiusMeters,
       };
     }
-  } else if (typeName === 'polygon') {
+  } else if (kind === 'polygon') {
     const points = await db
       .select({
         latitude: geofencePolygonPointsTable.latitude,
@@ -259,7 +267,7 @@ export async function getGeofenceWithGeometry(
       .orderBy(asc(geofencePolygonPointsTable.pointOrder));
 
     geometry = { type: 'polygon', points };
-  } else if (typeName === 'rectangular') {
+  } else if (kind === 'rectangular') {
     const [rect] = await db
       .select({
         nwLatitude: geofenceRectanglesTable.nwLatitude,
@@ -440,9 +448,9 @@ export async function getGeofenceMapData(
 
   // 2. Resolve geometry by type name
   let geometry: GeofenceGeometry = null;
-  const typeName = geofence.typeName.toLowerCase();
+  const kind = geofenceKind(geofence.typeName);
 
-  if (typeName === 'circular') {
+  if (kind === 'circular') {
     if (geofence.centerLatitude && geofence.centerLongitude && geofence.radiusMeters) {
       geometry = {
         type: 'circular',
@@ -451,7 +459,7 @@ export async function getGeofenceMapData(
         radiusMeters: geofence.radiusMeters,
       };
     }
-  } else if (typeName === 'polygon') {
+  } else if (kind === 'polygon') {
     const points = await db
       .select({
         latitude: geofencePolygonPointsTable.latitude,
@@ -465,7 +473,7 @@ export async function getGeofenceMapData(
     if (points.length > 0) {
       geometry = { type: 'polygon', points };
     }
-  } else if (typeName === 'rectangular') {
+  } else if (kind === 'rectangular') {
     const [rect] = await db
       .select({
         nwLatitude: geofenceRectanglesTable.nwLatitude,
@@ -592,13 +600,12 @@ export async function getGeofenceMapData(
     const device = devicesByAsset.get(asset.id);
     if (!device) continue;
     const latest = latestByDevice.get(String(device.id));
-    if (!latest) continue;
     assetsWithPositions.push({
-      id: assetMap.get(asset.id)!.id,
+      id: asset.id,
       number: asset.number,
-      lastLat: latest.latitude,
-      lastLng: latest.longitude,
-      lastTimestamp: latest.eventTimestamp,
+      lastLat: latest?.latitude ?? null,
+      lastLng: latest?.longitude ?? null,
+      lastTimestamp: latest?.eventTimestamp ?? null,
       deviceId: device.id,
       deviceName: device.name,
       deviceSerialNumber: device.serialNumber,

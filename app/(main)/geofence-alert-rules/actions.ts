@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { getUserByEmail } from '@/data/users';
+import { getOrCreateUserByEmail } from '@/data/users';
 import {
   createGeofenceAlertRule,
   updateGeofenceAlertRule,
@@ -32,7 +32,8 @@ async function resolveUser() {
   const primaryEmail = clerkUser?.emailAddresses[0]?.emailAddress;
   if (!primaryEmail) return null;
 
-  return getUserByEmail(primaryEmail);
+  const fullName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ') || primaryEmail;
+  return getOrCreateUserByEmail({ email: primaryEmail, name: fullName });
 }
 
 // ---------------------------------------------------------------------------
