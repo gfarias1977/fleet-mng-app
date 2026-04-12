@@ -9,6 +9,20 @@ import type { GeofenceMapData } from '@/data/geofences';
 // Fix Leaflet default icon issue with Webpack/Next.js
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 delete (L.Icon.Default.prototype as any)._getIconUrl;
+
+// ---------------------------------------------------------------------------
+// Custom alert marker icon — orange, visually distinct from default blue asset markers
+// ---------------------------------------------------------------------------
+
+const alertIcon = L.divIcon({
+  html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="36" fill="#f97316">
+    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+  </svg>`,
+  className: '',
+  iconSize: [28, 36],
+  iconAnchor: [14, 36],
+  popupAnchor: [0, -36],
+});
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -53,9 +67,16 @@ function FlyToAsset({ target }: { target: { lat: number; lng: number } | null | 
 interface Props {
   data: GeofenceMapData;
   flyToAsset?: { lat: number; lng: number } | null;
+  alertMarker?: {
+    lat: number;
+    lng: number;
+    typeName: string;
+    message: string | null;
+    alertTimestamp: Date;
+  } | null;
 }
 
-export default function GeofenceMap({ data, flyToAsset }: Props) {
+export default function GeofenceMap({ data, flyToAsset, alertMarker }: Props) {
   const { geofence, assets } = data;
   const { geometry } = geofence;
   const [tileLayer, setTileLayer] = useState<'default' | 'satellite'>('default');
@@ -110,7 +131,7 @@ export default function GeofenceMap({ data, flyToAsset }: Props) {
       )}
 
       {fitBounds && <FitBounds bounds={fitBounds} />}
-      <FlyToAsset target={flyToAsset} />
+      <FlyToAsset target={flyToAsset ?? alertMarker} />
 
       {/* Circular geofence */}
       {geometry?.type === 'circular' && (
@@ -162,6 +183,24 @@ export default function GeofenceMap({ data, flyToAsset }: Props) {
             </Popup>
           </Marker>
         ))}
+
+      {/* Alert marker — orange pin for selected alert location */}
+      {alertMarker && (
+        <Marker position={[alertMarker.lat, alertMarker.lng]} icon={alertIcon}>
+          <Popup>
+            <div className="text-sm space-y-0.5">
+              <p className="font-semibold" style={{ color: '#f97316' }}>{alertMarker.typeName}</p>
+              {alertMarker.message && <p className="text-xs">{alertMarker.message}</p>}
+              <p className="text-xs text-muted-foreground">
+                {new Date(alertMarker.alertTimestamp).toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Lat: {alertMarker.lat.toFixed(6)} | Lng: {alertMarker.lng.toFixed(6)}
+              </p>
+            </div>
+          </Popup>
+        </Marker>
+      )}
     </MapContainer>
     <button
       type="button"

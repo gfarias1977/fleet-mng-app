@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { Bell, BellDot, LocateFixed } from 'lucide-react';
+import { Bell, BellDot, LocateFixed, MapPin } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -68,6 +68,13 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
   const [alertsSheet, setAlertsSheet] = useState<{ assetId: number; assetName: string } | null>(null);
   const [alertRows, setAlertRows] = useState<AlertRow[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
+  const [alertMarker, setAlertMarker] = useState<{
+    lat: number;
+    lng: number;
+    typeName: string;
+    message: string | null;
+    alertTimestamp: Date;
+  } | null>(null);
 
   // Notifications sheet
   const [notifSheet, setNotifSheet] = useState<{ assetId: number; assetName: string } | null>(null);
@@ -167,7 +174,7 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
             )}
             {!loading && !error && mapData !== null && (
               <>
-                <GeofenceMap data={mapData} flyToAsset={flyToAsset} />
+                <GeofenceMap data={mapData} flyToAsset={flyToAsset} alertMarker={alertMarker} />
 
                 {mapData.assets.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center">
@@ -244,7 +251,7 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
       </Dialog>
 
       {/* Alerts Sheet */}
-      <Sheet open={alertsSheet !== null} onOpenChange={(v) => { if (!v) setAlertsSheet(null); }}>
+      <Sheet open={alertsSheet !== null} onOpenChange={(v) => { if (!v) { setAlertsSheet(null); setAlertMarker(null); } }}>
         <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Alerts — {alertsSheet?.assetName ?? ''}</SheetTitle>
@@ -267,6 +274,7 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
                     <TableHead>Severity</TableHead>
                     <TableHead>Message</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Mapa</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -277,6 +285,27 @@ export function GeofenceMapDialog({ open, geofenceId, geofenceName, onClose }: P
                       <TableCell><SeverityBadge value={row.severity} /></TableCell>
                       <TableCell className="text-xs max-w-[200px] truncate">{row.message ?? '—'}</TableCell>
                       <TableCell className="text-xs">{row.status ?? '—'}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Mostrar en mapa"
+                          disabled={!row.latitude || !row.longitude}
+                          onClick={() => {
+                            if (row.latitude && row.longitude) {
+                              setAlertMarker({
+                                lat: parseFloat(row.latitude),
+                                lng: parseFloat(row.longitude),
+                                typeName: row.typeName,
+                                message: row.message,
+                                alertTimestamp: row.alertTimestamp,
+                              });
+                            }
+                          }}
+                        >
+                          <MapPin className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
